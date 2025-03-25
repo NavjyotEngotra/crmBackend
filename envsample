@@ -2,3 +2,5 @@ PORT=8000
 MONGODB_URL= "url"
 CORS_ORIGIN=*
 JWT_SECRET=your_super_secret_key
+DB_NAME=bankDB
+BASE_URL=http://localhost:8000

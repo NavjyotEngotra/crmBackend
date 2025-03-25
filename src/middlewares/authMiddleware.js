@@ -1,5 +1,4 @@
 import jwt from "jsonwebtoken";
-import { User } from "../models/user.js";
 import { asyncHandler } from "../utilities/asyncHandler.js";
 
 export const protect = asyncHandler(async (req, res, next) => {
@@ -19,11 +18,24 @@ export const protect = asyncHandler(async (req, res, next) => {
     }
 });
 
-// ✅ Ensure isAdmin is exported
-export const isAdmin = (req, res, next) => {
-    if (req.user && req.user.name === "admin") {
+
+export const verifySuperAdmin = (req, res, next) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+
+        if (!token) {
+            return res.status(401).json({ message: "Unauthorized, token required" });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        if (!decoded || decoded.role !== "superadmin") {
+            return res.status(403).json({ message: "Forbidden: Only Super Admins can access this" });
+        }
+
+        req.user = decoded;
         next();
-    } else {
-        res.status(403).json({ message: "Access denied. Admins only." });
+    } catch (error) {
+        return res.status(401).json({ message: "Invalid token" });
     }
 };

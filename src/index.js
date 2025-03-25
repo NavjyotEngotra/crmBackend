@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors"
 import { Server } from "socket.io";
 import { createServer } from 'node:http';
+import planRoutes from "./routes/planRoutes.js";
 
 dotenv.config({
     path:"./env"
@@ -36,6 +37,16 @@ io.on("connection", (socket) => {
     console.log("User disconnected:", socket.id);
   });
 });
+
+
+// Routes
+import superAdminRoute from "./routes/superAdminRoute.js"
+
+app.use("/api/superAdmin", superAdminRoute);
+app.use("/api/planRoutes", planRoutes);
+
+
+
 
 ;(async()=>{
   try{
