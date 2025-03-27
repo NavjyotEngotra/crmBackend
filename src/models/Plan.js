@@ -7,7 +7,7 @@ const planSchema = new mongoose.Schema(
             required: true,
             maxlength: 255,
         },
-        price: {
+        price: { //in inr
             type: Number,
             required: true,
             min: 0, // Ensures price can't be negative
@@ -16,7 +16,7 @@ const planSchema = new mongoose.Schema(
             type: String,
             maxlength: 5000,
         },
-        duration: {
+        duration: { //in months 
             type: Number,
             required: true,
             min: 1, // Minimum duration is 1 month
