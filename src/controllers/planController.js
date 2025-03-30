@@ -32,6 +32,16 @@ export const getAllPlans = async (req, res) => {
     }
 };
 
+export const getActivePlans = async (req, res) => {
+    try {
+        const plans = await Plan.find({ status: 1 }); // ✅ Fetch only active plans
+
+        return res.status(200).json(plans);
+    } catch (error) {
+        return res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
 export const getPlanById = async (req, res) => {
     try {
         const plan = await Plan.findById(req.params.id);
@@ -75,6 +85,42 @@ export const deletePlan = async (req, res) => {
         }
 
         return res.status(200).json({ message: "Plan deleted successfully" });
+    } catch (error) {
+        return res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
+export const softDeletePlan = async (req, res) => {
+    try {
+        const updatedPlan = await Plan.findByIdAndUpdate(
+            req.params.id,
+            { status: 0 },  // ✅ Sets status to 0 instead of deleting
+            { new: true }   // ✅ Returns the updated document
+        );
+
+        if (!updatedPlan) {
+            return res.status(404).json({ message: "Plan not found" });
+        }
+
+        return res.status(200).json({ message: "Plan status updated to inactive (0)", plan: updatedPlan });
+    } catch (error) {
+        return res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
+export const recoverPlan = async (req, res) => {
+    try {
+        const updatedPlan = await Plan.findByIdAndUpdate(
+            req.params.id,
+            { status: 1 },  // ✅ Reactivates the plan
+            { new: true }
+        );
+
+        if (!updatedPlan) {
+            return res.status(404).json({ message: "Plan not found" });
+        }
+
+        return res.status(200).json({ message: "Plan recovered successfully", plan: updatedPlan });
     } catch (error) {
         return res.status(500).json({ message: "Server error", error: error.message });
     }

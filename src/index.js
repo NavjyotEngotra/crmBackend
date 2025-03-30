@@ -44,7 +44,7 @@ io.on("connection", (socket) => {
 // Routes
 
 app.use("/api/superAdmin", superAdminRoute);
-app.use("/api/planRoutes", planRoutes);
+app.use("/api/plan", planRoutes);
 app.use("/api/payment", paymentRoutes);
 
 

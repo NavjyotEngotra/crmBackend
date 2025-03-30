@@ -16,6 +16,10 @@ const planSchema = new mongoose.Schema(
             type: String,
             maxlength: 5000,
         },
+        status: {
+            type: Number,
+            default: 1, // ✅ Sets default value to 1
+        },
         duration: { //in months 
             type: Number,
             required: true,
