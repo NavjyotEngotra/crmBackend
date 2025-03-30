@@ -7,13 +7,19 @@ import { Server } from "socket.io";
 import { createServer } from 'node:http';
 import planRoutes from "./routes/planRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
-import superAdminRoute from "./routes/superAdminRoute.js"
+import superAdminRoute from "./routes/superAdminRoute.js";
+import organizationRoute from "./routes/organizationRoutes.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config({
     path:"./env"
 })
 
 const app = express()
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 app.use(cors({
     origin:process.env.CORS_ORIGIN
@@ -22,6 +28,9 @@ app.use(express.json())
 app.use(express.urlencoded())
 app.use(express.static("public"))
 app.use(cookieParser())
+
+app.set("views", path.join(__dirname, "view"));
+app.set("view engine", "ejs");
 
 // Create HTTP server
 const server = createServer(app);
@@ -46,8 +55,11 @@ io.on("connection", (socket) => {
 app.use("/api/superAdmin", superAdminRoute);
 app.use("/api/plan", planRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/organization", organizationRoute);
 
-
+// app.get("/razorpay", (req, res) => {
+//   res.render("razorpay"); // Render the Razorpay button
+// });
 
 ;(async()=>{
   try{

@@ -34,7 +34,7 @@ export const getAllPlans = async (req, res) => {
 
 export const getActivePlans = async (req, res) => {
     try {
-        const plans = await Plan.find({ status: 1 }); // ✅ Fetch only active plans
+        const plans = await Plan.find({ status: 1 }); //  Fetch only active plans
 
         return res.status(200).json(plans);
     } catch (error) {
@@ -94,8 +94,8 @@ export const softDeletePlan = async (req, res) => {
     try {
         const updatedPlan = await Plan.findByIdAndUpdate(
             req.params.id,
-            { status: 0 },  // ✅ Sets status to 0 instead of deleting
-            { new: true }   // ✅ Returns the updated document
+            { status: 0 },  //  Sets status to 0 instead of deleting
+            { new: true }   //  Returns the updated document
         );
 
         if (!updatedPlan) {
@@ -112,7 +112,7 @@ export const recoverPlan = async (req, res) => {
     try {
         const updatedPlan = await Plan.findByIdAndUpdate(
             req.params.id,
-            { status: 1 },  // ✅ Reactivates the plan
+            { status: 1 },  //  Reactivates the plan
             { new: true }
         );
 
