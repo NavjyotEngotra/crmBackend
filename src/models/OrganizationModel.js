@@ -21,6 +21,7 @@ const organizationSchema = new mongoose.Schema(
             type: String,
             required: true,
             select: false, // Do not return password in queries
+            minlength: 6, // Minimum 6 characters
         },
         plan_id: {
             type: mongoose.Schema.Types.ObjectId,

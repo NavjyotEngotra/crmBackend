@@ -120,3 +120,58 @@ export const verifyPayment = async (req, res) => {
         res.status(500).json({ success: false, message: "Payment verification failed", error: error.message });
     }
 };
+
+
+export const getPayments = async (req, res) => {
+    try {
+        const { page = 1 } = req.query;
+
+        // Pagination setup
+        const limit = 50;
+        const skip = (page - 1) * limit;
+
+        // Fetch payments with sorting and pagination
+        const payments = await Payment.find()
+            .sort({ createdAt: -1 })  // Newest first
+            .skip(skip)
+            .limit(limit)
+            .populate("organizationId")
+            .populate("planId");
+
+        // Total payments count (for pagination info)
+        const total = await Payment.countDocuments();
+
+        res.json({
+            success: true,
+            payments,
+            pagination: {
+                total,
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(total / limit),
+            },
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Search payments by organizationId
+export const searchPayments = async (req, res) => {
+    try {
+        const { organizationId } = req.query;
+
+        if (!organizationId) {
+            return res.status(400).json({ success: false, message: "organizationId is required for search" });
+        }
+
+        // Search payments by organizationId
+        const payments = await Payment.find({ organizationId })
+            .sort({ createdAt: -1 })  // Newest first
+            .populate("organizationId")
+            .populate("planId");
+
+        res.json({ success: true, payments });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

@@ -3,6 +3,7 @@ import Plan from "../models/Plan.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { generateOrganizationToken } from "../utilities/generateToken.js";
+import { sendEmail } from "../utilities/sendEmail.js";
 
 //  Create an Organization
 export const createOrganization = async (req, res) => {
@@ -15,7 +16,7 @@ export const createOrganization = async (req, res) => {
             return res.status(400).json({ success: false, message: "Email already exists" });
         }
 
-        // 🛑 Ensure only allowed fields are passed
+        //  Ensure only allowed fields are passed
         const organization = new Organization({
             name,
             email,
@@ -37,12 +38,32 @@ export const createOrganization = async (req, res) => {
 //  Get All Organizations
 export const getOrganizations = async (req, res) => {
     try {
-        const organizations = await Organization.find().populate("plan_id");
-        res.json({ success: true, organizations });
+        // Get the page number from the query params (default to 1)
+        const page = parseInt(req.query.page) || 1;
+        const limit = 25;
+        const skip = (page - 1) * limit;
+
+        // Fetch organizations with pagination and populate the plan_id
+        const organizations = await Organization.find()
+            .populate("plan_id")
+            .skip(skip)
+            .limit(limit);
+
+        // Get the total number of organizations
+        const totalOrganizations = await Organization.countDocuments();
+
+        res.json({
+            success: true,
+            organizations,
+            currentPage: page,
+            totalPages: Math.ceil(totalOrganizations / limit),
+            totalOrganizations,
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
 
 //  Organization Buys a Plan
 // export const buyPlan = async (req, res) => {
@@ -55,7 +76,7 @@ export const getOrganizations = async (req, res) => {
 //         const plan = await Plan.findById(planId);
 //         if (!plan) return res.status(404).json({ success: false, message: "Plan not found" });
 
-//         // 🗓️ Calculate plan expiration date
+//         //  Calculate plan expiration date
 //         const expireDate = new Date();
 //         expireDate.setMonth(expireDate.getMonth() + plan.duration);
 
@@ -85,12 +106,14 @@ export const loginOrganization = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Check if the organization exists
-        const organization = await Organization.findOne({ email }).select("+password");;
-        if (!organization) return res.status(404).json({ success: false, message: "Organization not found" });
+        // Check if the organization exists and is active (status = 1)
+        const organization = await Organization.findOne({ email, status: 1 }).select("+password");
+        if (!organization) return res.status(404).json({ success: false, message: "Organization not found or inactive" });
 
+        // Check if the password matches
         const isMatch = await bcrypt.compare(password, organization.password);
         if (!isMatch) return res.status(401).json({ success: false, message: "Invalid credentials" });
+
         // Generate JWT Token using the provided function
         const token = generateOrganizationToken(organization._id);
 
@@ -102,8 +125,13 @@ export const loginOrganization = async (req, res) => {
 
 export const editOrganization = async (req, res) => {
     try {
-        const { id:organizationId } = req.params;
-        const { name, email, password, pinCode, address,status } = req.body;
+        const { id: organizationId } = req.params;
+        const { name, email, password, pinCode, address, status } = req.body;
+
+        // ✅ Ensure the logged-in organization is trying to edit its own data
+        if (organizationId !== req.user.id) {
+            return res.status(403).json({ success: false, message: "Forbidden: You can only edit your own data" });
+        }
 
         // ✅ Fetch the organization
         const organization = await Organization.findById(organizationId);
@@ -121,7 +149,7 @@ export const editOrganization = async (req, res) => {
         if (email) organization.email = email;
         if (pinCode) organization.pinCode = pinCode;
         if (address) organization.address = address;
-        if (typeof status !== "undefined")organization.status = status;
+        if (typeof status !== "undefined") organization.status = status;
 
         // ✅ Hash password if provided
         if (password) {
@@ -137,3 +165,78 @@ export const editOrganization = async (req, res) => {
 };
 
 
+export const searchOrganizations = async (req, res) => {
+    try {
+        const searchQuery = req.query.search || "";
+
+        // Check if search query is empty
+        if (!searchQuery.trim()) {
+            return res.status(400).json({ success: false, message: "Search query is required" });
+        }
+
+        const organizations = await Organization.find({
+            name: { $regex: new RegExp(searchQuery, "i") }  
+        }).populate("plan_id");
+
+        res.json({ success: true, organizations });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+
+//  Forgot Password (Send Reset Link)
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        // Check if the organization exists
+        const organization = await Organization.findOne({ email });
+        if (!organization) {
+            return res.status(404).json({ success: false, message: "Organization not found" });
+        }
+
+        // Generate Reset Token
+        const resetToken = jwt.sign({ id: organization._id }, process.env.JWT_RESET_SECRET, {
+            expiresIn: process.env.RESET_TOKEN_EXPIRES_IN,
+        });
+
+        // Reset URL
+        const resetUrl = `${req.protocol}://${req.get("host")}/api/auth/reset-password/${resetToken}`;
+
+        // Send the reset password email
+        await sendEmail(
+            email,
+            "Password Reset Request",
+            `Please click the link to reset your password: ${resetUrl}`
+        );
+
+        res.json({ success: true, message: "Password reset link sent to your email" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+//  Reset Password
+export const resetPassword = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { password } = req.body;
+
+        // Verify Token
+        const decoded = jwt.verify(token, process.env.JWT_RESET_SECRET);
+
+        // Find the organization by ID
+        const organization = await Organization.findById(decoded.id);
+        if (!organization) {
+            return res.status(404).json({ success: false, message: "Invalid or expired token" });
+        }
+
+        organization.password = password;
+        await organization.save();
+
+        res.json({ success: true, message: "Password reset successful" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Invalid or expired token" });
+    }
+};

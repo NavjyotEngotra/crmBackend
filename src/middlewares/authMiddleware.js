@@ -54,7 +54,7 @@ export const verifyOrganization = (req, res, next) => {
             return res.status(403).json({ message: "Forbidden: Only Organizations can access this" });
         }
 
-        req.user = decoded;
+        req.user = decoded; // Store decoded token data in the request object
         next();
     } catch (error) {
         return res.status(401).json({ message: "Invalid token" });
