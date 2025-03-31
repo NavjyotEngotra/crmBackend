@@ -117,7 +117,7 @@ export const loginOrganization = async (req, res) => {
         // Generate JWT Token using the provided function
         const token = generateOrganizationToken(organization._id);
 
-        res.json({ success: true, message: "Login successful", token });
+        res.json({ success: true, message: "Login successful", token, organization });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
