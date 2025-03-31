@@ -205,12 +205,15 @@ export const forgotPassword = async (req, res) => {
         const resetUrl = `${req.protocol}://${req.get("host")}/api/auth/reset-password/${resetToken}`;
 
         // Send the reset password email
-        await sendEmail(
+        let a = await sendEmail(
             email,
             "Password Reset Request",
             `Please click the link to reset your password: ${resetUrl}`
         );
 
+        if(!a){
+            return res.status(500).json({ success: false, message: "Something went wrong" });
+        }
         res.json({ success: true, message: "Password reset link sent to your email" });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
