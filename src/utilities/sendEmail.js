@@ -18,7 +18,8 @@ export const sendEmail = async (to, subject, text) => {
             text,
         });
 
+        return true;
     } catch (error) {
-       
+        return false;
     }
 };
