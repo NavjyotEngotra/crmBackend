@@ -3,7 +3,6 @@ MONGODB_URL= "url"
 CORS_ORIGIN=*
 JWT_SECRET=your_super_secret_key
 DB_NAME=bankDB
-BASE_URL=http://localhost:8000
 RAZORPAY_KEY_ID=your-razorpay-key-id
 RAZORPAY_KEY_SECRET=your-razorpay-key-secret
 JWT_RESET_SECRET=your_jwt_reset_secret_key
