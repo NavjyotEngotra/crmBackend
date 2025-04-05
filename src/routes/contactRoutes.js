@@ -5,7 +5,8 @@ import {
     getContacts,
     getDeletedContacts,
     deleteContact,
-    searchContactsByName
+    searchContactsByName,
+    getContactById
 } from "../controllers/contactController.js";
 import { isAdmin } from "../middlewares/authMiddleware.js";
 
@@ -17,5 +18,6 @@ router.get("/", getContacts);
 router.get("/deleted", getDeletedContacts);
 router.put("/delete/:id",isAdmin, deleteContact);
 router.get("/search", searchContactsByName);
+router.get("/:id", getContactById);
 
 export default router;

@@ -210,3 +210,74 @@ export const resetTeamMemberPassword = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+export const searchTeamMembers = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const organization = await getOrganizationDetails(token);
+
+        const { name } = req.query;
+
+        if (!name) {
+            return res.status(400).json({ success: false, message: "Name query parameter is required" });
+        }
+
+        const teamMembers = await TeamMember.find({
+            organization_id: organization._id,
+            status: 1,
+            name: { $regex: name, $options: "i" } // case-insensitive search
+        }).select("-password"); // exclude password
+
+        res.json({ success: true, teamMembers });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const getMyOrganizationTeamMembers = async (req, res) => {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      const teamMember = await TeamMember.findById(decoded.id);
+      if (!teamMember || teamMember.status !== 1) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+  
+      const members = await TeamMember.find({
+        organization_id: teamMember.organization_id,
+        status: 1,
+      }).select("-password");
+  
+      res.json({ success: true, teamMembers: members });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  };
+
+  export const getTeamMemberById = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Get the requesting user
+        const requester = await TeamMember.findById(decoded.id);
+        if (!requester || requester.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const { id } = req.params;
+
+        // Get the team member by id
+        const member = await TeamMember.findById(id).select("-password");
+
+        // Check if the member exists and belongs to same organization
+        if (!member || member.organization_id.toString() !== requester.organization_id.toString()) {
+            return res.status(403).json({ success: false, message: "Team Member not found" });
+        }
+
+        res.json({ success: true, teamMember: member });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

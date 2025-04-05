@@ -170,3 +170,27 @@ export const searchContactsByName = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+// Get Contact by ID
+export const getContactById = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        if (!teamMember || teamMember.status !== 1)
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+
+        const { id } = req.params;
+
+        const contact = await Contact.findById(id);
+
+        if (!contact || contact.organization_id.toString() !== teamMember.organization_id.toString()) {
+            return res.status(403).json({ success: false, message: "Contact not found" });
+        }
+
+        res.json({ success: true, contact });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

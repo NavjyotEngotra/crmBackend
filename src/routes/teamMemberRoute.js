@@ -6,7 +6,10 @@ import {
     getDeletedTeamMembers,
     loginTeamMember,
     updateTeamMemberStatus,
-    resetTeamMemberPassword
+    resetTeamMemberPassword,
+    searchTeamMembers,
+    getMyOrganizationTeamMembers,
+    getTeamMemberById
 } from "../controllers/teamMemberController.js"; // adjust path if needed
 
 const router = express.Router();
@@ -29,5 +32,11 @@ router.get("/deleted", getDeletedTeamMembers);
 router.put("/status", updateTeamMemberStatus); 
 
 router.put("/reset-password-by-orginization", resetTeamMemberPassword);
+
+router.get("/search", searchTeamMembers);
+
+router.get("/my-team-members", getMyOrganizationTeamMembers);
+
+router.get("/:id", getTeamMemberById);
 
 export default router;
