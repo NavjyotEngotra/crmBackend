@@ -5,7 +5,8 @@ import {
     getTeamMembers,
     getDeletedTeamMembers,
     loginTeamMember,
-    updateTeamMemberStatus
+    updateTeamMemberStatus,
+    resetTeamMemberPassword
 } from "../controllers/teamMemberController.js"; // adjust path if needed
 
 const router = express.Router();
@@ -26,5 +27,7 @@ router.get("/", getTeamMembers);
 router.get("/deleted", getDeletedTeamMembers);
 
 router.put("/status", updateTeamMemberStatus); 
+
+router.put("/reset-password-by-orginization", resetTeamMemberPassword);
 
 export default router;

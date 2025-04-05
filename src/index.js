@@ -10,6 +10,7 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import superAdminRoute from "./routes/superAdminRoute.js";
 import organizationRoute from "./routes/organizationRoutes.js";
 import teamMemberRoute from "./routes/teamMemberRoute.js"
+import contactRoute from "./routes/contactRoutes.js"
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -58,6 +59,7 @@ app.use("/api/plan", planRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/organization", organizationRoute);
 app.use("/api/team-member", teamMemberRoute);
+app.use("/api/contact", contactRoute);
 
 // app.get("/razorpay", (req, res) => {
 //   res.render("razorpay"); // Render the Razorpay button

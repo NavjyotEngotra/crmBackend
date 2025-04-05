@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { asyncHandler } from "../utilities/asyncHandler.js";
+import TeamMember from "../models/TeamMemberModel.js";
 
 export const protect = asyncHandler(async (req, res, next) => {
     let token = req.headers.authorization;
@@ -58,5 +59,22 @@ export const verifyOrganization = (req, res, next) => {
         next();
     } catch (error) {
         return res.status(401).json({ message: "Invalid token" });
+    }
+};
+
+export const isAdmin = async (req, res, next) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        if (!teamMember || teamMember.role !== "admin") {
+            return res.status(403).json({ success: false, message: "Only admins are allowed to perform this action" });
+        }
+
+        req.teamMember = teamMember; // forward if needed
+        next();
+    } catch (error) {
+        res.status(401).json({ success: false, message: "Invalid token or unauthorized" });
     }
 };

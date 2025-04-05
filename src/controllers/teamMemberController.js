@@ -26,7 +26,6 @@ export const createTeamMember = async (req, res) => {
             password,
             role,
             organization_id: organization._id,
-            organizationName: organization.name,
         });
 
         await newMember.save();
@@ -64,8 +63,28 @@ export const getTeamMembers = async (req, res) => {
         const token = req.headers.authorization?.split(" ")[1];
         const organization = await getOrganizationDetails(token);
 
-        const members = await TeamMember.find({ organization_id: organization._id, status: 1 }).select("-password");
-        res.json({ success: true, teamMembers: members });
+        const page = parseInt(req.query.page) || 1;
+        const limit = 50;
+        const skip = (page - 1) * limit;
+
+        const [members, total] = await Promise.all([
+            TeamMember.find({ organization_id: organization._id, status: 1 })
+                .select("-password")
+                .skip(skip)
+                .limit(limit),
+            TeamMember.countDocuments({ organization_id: organization._id, status: 1 })
+        ]);
+
+        res.json({
+            success: true,
+            teamMembers: members,
+            pagination: {
+                total,
+                page,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: skip + members.length < total,
+            }
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -76,8 +95,28 @@ export const getDeletedTeamMembers = async (req, res) => {
         const token = req.headers.authorization?.split(" ")[1];
         const organization = await getOrganizationDetails(token);
 
-        const members = await TeamMember.find({ organization_id: organization._id, status: 0 }).select("-password");
-        res.json({ success: true, teamMembers: members });
+        const page = parseInt(req.query.page) || 1;
+        const limit = 50;
+        const skip = (page - 1) * limit;
+
+        const [members, total] = await Promise.all([
+            TeamMember.find({ organization_id: organization._id, status: 0 })
+                .select("-password")
+                .skip(skip)
+                .limit(limit),
+            TeamMember.countDocuments({ organization_id: organization._id, status: 1 })
+        ]);
+
+        res.json({
+            success: true,
+            teamMembers: members,
+            pagination: {
+                total,
+                page,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: skip + members.length < total,
+            }
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -140,6 +179,33 @@ export const updateTeamMemberStatus = async (req, res) => {
         await teamMember.save();
 
         res.json({ success: true, message: `Team member ${status === 1 ? "activated" : "deactivated"} successfully` });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const resetTeamMemberPassword = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const organization = await getOrganizationDetails(token);
+
+        const { teamMemberId, newPassword } = req.body;
+
+        if (!teamMemberId || !newPassword) {
+            return res.status(400).json({ success: false, message: "Team member ID and new password are required" });
+        }
+
+        const teamMember = await TeamMember.findById(teamMemberId);
+
+        if (!teamMember || teamMember.organization_id.toString() !== organization._id.toString()) {
+            return res.status(403).json({ success: false, message: "You are not authorized to reset this password" });
+        }
+
+        teamMember.password = newPassword;
+
+        await teamMember.save();
+
+        res.json({ success: true, message: "Password reset successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

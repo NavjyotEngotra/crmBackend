@@ -13,10 +13,6 @@ const teamMemberSchema = new mongoose.Schema(
             required: true,
             trim: true,
         },
-        full_name: {
-            type: String,
-            trim: true,
-        },
         email: {
             type: String,
             trim: true,
@@ -39,10 +35,6 @@ const teamMemberSchema = new mongoose.Schema(
         },
         domainName: {
             type: String,
-        },
-        organizationName: {
-            type: String,
-            required: true,
         },
         status: {
             type: Number,
