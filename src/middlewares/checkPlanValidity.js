@@ -1,4 +1,4 @@
-import Organization from "../models/organizationModel.js";
+import Organization from "../models/OrganizationModel.js";
 
 export const ensurePaymentVerified = async (req, res, next) => {
     try {

@@ -4,36 +4,88 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { generateOrganizationToken } from "../utilities/generateToken.js";
 import { sendEmail } from "../utilities/sendEmail.js";
+import OTPModel from "../models/OTPModel.js";
+import VerifiedOrganizationModel from "../models/VerifiedOrganizationModel.js";
 
-//  Create an Organization
+// Step 1: Send OTP
+export const sendOrganizationOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        const existingOrg = await Organization.findOne({ email });
+        if (existingOrg) return res.status(400).json({ success: false, message: "Email already exists" });
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+        await OTPModel.findOneAndUpdate(
+            { email },
+            { otp, createdAt: new Date() },
+            { upsert: true, new: true }
+        );
+
+        const sent = await sendEmail(email, "OTP Verification", `Your OTP is: ${otp}`);
+        if (!sent) return res.status(500).json({ success: false, message: "Failed to send OTP" });
+
+        res.json({ success: true, message: "OTP sent successfully" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Step 2: Verify OTP
+export const verifyOrganizationOTP = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+
+        const record = await OTPModel.findOne({ email });
+        if (!record || record.otp !== otp) {
+            return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+        }
+
+        await OTPModel.deleteOne({ email });
+
+        await VerifiedOrganizationModel.findOneAndUpdate(
+            { email },
+            { verifiedAt: new Date() },
+            { upsert: true }
+        );
+
+        res.json({ success: true, message: "OTP verified successfully" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Step 3: Create Organization (only if email verified)
 export const createOrganization = async (req, res) => {
     try {
         const { name, email, password, pinCode, address } = req.body;
 
-        // Check if email already exists
-        const existingOrg = await Organization.findOne({ email });
-        if (existingOrg) {
-            return res.status(400).json({ success: false, message: "Email already exists" });
-        }
+        const isVerified = await VerifiedOrganizationModel.findOne({ email });
+        if (!isVerified) return res.status(400).json({ success: false, message: "Email not verified" });
 
-        //  Ensure only allowed fields are passed
+        const existingOrg = await Organization.findOne({ email });
+        if (existingOrg) return res.status(400).json({ success: false, message: "Email already exists" });
+
         const organization = new Organization({
             name,
             email,
             password,
             pinCode,
             address,
-            plan_id: null,  // Make sure no plan is assigned initially
-            plan_expire_date: null
+            plan_id: null,
+            plan_expire_date: null,
         });
 
         await organization.save();
+        await VerifiedOrganizationModel.deleteOne({ email }); // remove to prevent reuse
 
-        res.status(201).json({ success: true, organization });
+        res.status(201).json({ success: true, message: "Organization created", organization });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
 
 //  Get All Organizations
 export const getOrganizations = async (req, res) => {
@@ -116,8 +168,9 @@ export const loginOrganization = async (req, res) => {
 
         // Generate JWT Token using the provided function
         const token = generateOrganizationToken(organization._id);
-
-        res.json({ success: true, message: "Login successful", token, organization });
+        const orgData = organization.toObject();
+        delete orgData.password;
+        res.json({ success: true, message: "Login successful", token, organization:orgData });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -126,7 +179,7 @@ export const loginOrganization = async (req, res) => {
 export const editOrganization = async (req, res) => {
     try {
         const { id: organizationId } = req.params;
-        const { name, email, password, pinCode, address, status } = req.body;
+        const { name, password, pinCode, address, status } = req.body;
 
         // ✅ Ensure the logged-in organization is trying to edit its own data
         if (organizationId !== req.user.id) {
@@ -146,7 +199,6 @@ export const editOrganization = async (req, res) => {
 
         // ✅ Update fields if provided
         if (name) organization.name = name;
-        if (email) organization.email = email;
         if (pinCode) organization.pinCode = pinCode;
         if (address) organization.address = address;
         if (typeof status !== "undefined") organization.status = status;
