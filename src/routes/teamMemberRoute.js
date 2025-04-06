@@ -9,6 +9,7 @@ import {
     resetTeamMemberPassword,
     searchTeamMembers,
     getMyOrganizationTeamMembers,
+    getOrganization,
     getTeamMemberById
 } from "../controllers/teamMemberController.js"; // adjust path if needed
 
@@ -37,6 +38,8 @@ router.get("/search", searchTeamMembers);
 
 router.get("/my-team-members", getMyOrganizationTeamMembers);
 
+router.get("/getOrganization", getOrganization);
 router.get("/:id", getTeamMemberById);
+
 
 export default router;

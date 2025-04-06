@@ -3,6 +3,7 @@ import { getOrganizationDetails } from "../utilities/getOrganizationDetails.js"
 import {generateToken} from "../utilities/generateToken.js"
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import Organization from "../models/OrganizationModel.js";
 
 export const createTeamMember = async (req, res) => {
     try {
@@ -281,3 +282,37 @@ export const getMyOrganizationTeamMembers = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+export const getOrganization = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        if (!token) return res.status(401).json({ success: false, message: "No token provided" });
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        if (!teamMember) {
+            return res.status(404).json({ success: false, message: "Team member not found" });
+        }
+
+        const organization = await Organization.findById(teamMember.organization_id);
+        if (!organization) {
+            return res.status(404).json({ success: false, message: "Organization not found" });
+        }
+
+        const orgData = organization.toObject();
+        delete orgData.password;
+        delete orgData.plan_id;
+        delete orgData.plan_expire_date;
+        delete orgData.status;
+        delete orgData.createdAt;
+        delete orgData.updatedAt;
+        delete orgData.gstNo;
+        delete orgData._id;
+
+        res.json({ success: true, organization: orgData });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+

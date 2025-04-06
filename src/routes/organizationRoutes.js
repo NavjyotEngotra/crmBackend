@@ -1,5 +1,5 @@
 import express from "express";
-import { createOrganization, getOrganizations, deleteOrganization, loginOrganization, editOrganization, searchOrganizations, forgotPassword, resetPassword, sendOrganizationOTP, verifyOrganizationOTP } from "../controllers/organizationController.js";
+import { createOrganization, getOrganization, getOrganizations, deleteOrganization, loginOrganization, editOrganization, searchOrganizations, forgotPassword, resetPassword, sendOrganizationOTP, verifyOrganizationOTP } from "../controllers/organizationController.js";
 import { verifyOrganization, verifySuperAdmin } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
@@ -15,5 +15,6 @@ router.post("/login", loginOrganization);
 router.put("/:id", verifyOrganization , editOrganization );
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password/:token", resetPassword);
+router.get("/getOrganization",getOrganization );
 
 export default router;

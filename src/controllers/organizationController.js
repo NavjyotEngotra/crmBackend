@@ -1,11 +1,11 @@
 import Organization from "../models/OrganizationModel.js";
-import Plan from "../models/Plan.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { generateOrganizationToken } from "../utilities/generateToken.js";
 import { sendEmail } from "../utilities/sendEmail.js";
 import OTPModel from "../models/OTPModel.js";
 import VerifiedOrganizationModel from "../models/VerifiedOrganizationModel.js";
+import { getOrganizationDetails } from "../utilities/getOrganizationDetails.js";
 
 // Step 1: Send OTP
 export const sendOrganizationOTP = async (req, res) => {
@@ -297,6 +297,25 @@ export const resetPassword = async (req, res) => {
         res.json({ success: true, message: "Password reset successful" });
     } catch (error) {
         res.status(500).json({ success: false, message: "Invalid or expired token" });
+    }
+};
+
+export const getOrganization = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        if (!token) return res.status(401).json({ success: false, message: "No token provided" });
+
+        const organization = await getOrganizationDetails(token);
+        if (!organization) {
+            return res.status(404).json({ success: false, message: "Organization not found" });
+        }
+
+        const orgData = organization.toObject();
+        delete orgData.password;
+
+        res.json({ success: true, organization: orgData });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 

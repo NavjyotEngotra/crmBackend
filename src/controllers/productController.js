@@ -103,41 +103,85 @@ export const updateProduct = async (req, res) => {
     }
 };
 
-// Get All Products (active)
 export const getProducts = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const teamMember = await TeamMember.findById(decoded.id);
 
+        if (!teamMember || teamMember.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const page = parseInt(req.query.page) || 1;
+        const limit = 50;
+        const skip = (page - 1) * limit;
+
         const products = await Product.find({
             organization_id: teamMember.organization_id,
             status: 1,
-        }).sort({ createdAt: -1 });
+        })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
-        res.json({ success: true, products });
+        const totalCount = await Product.countDocuments({
+            organization_id: teamMember.organization_id,
+            status: 1,
+        });
+
+        res.json({
+            success: true,
+            currentPage: page,
+            totalPages: Math.ceil(totalCount / limit),
+            totalProducts: totalCount,
+            products,
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// Get Deleted Products
+// Get Deleted Products with Pagination
 export const getDeletedProducts = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const teamMember = await TeamMember.findById(decoded.id);
 
+        if (!teamMember || teamMember.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const page = parseInt(req.query.page) || 1;
+        const limit = 50;
+        const skip = (page - 1) * limit;
+
         const products = await Product.find({
+            organization_id: teamMember.organization_id,
+            status: 0,
+        })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        const totalCount = await Product.countDocuments({
             organization_id: teamMember.organization_id,
             status: 0,
         });
 
-        res.json({ success: true, products });
+        res.json({
+            success: true,
+            currentPage: page,
+            totalPages: Math.ceil(totalCount / limit),
+            totalDeletedProducts: totalCount,
+            products,
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
 
 // Soft Delete Product
 export const updateStatus = async (req, res) => {
