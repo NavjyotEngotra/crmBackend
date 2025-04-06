@@ -229,3 +229,27 @@ export const searchCompaniesByName = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+// Get Companies Owned by Logged-In Team Member
+export const getOwnedCompanies = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        if (!token) return res.status(401).json({ success: false, message: "Token missing" });
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        if (!teamMember || teamMember.status !== 1)
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+
+        const companies = await Company.find({
+            organization_id: teamMember.organization_id,
+            owner_id: teamMember._id,
+            status: 1, // only active contacts
+        });
+
+        res.json({ success: true, companies });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

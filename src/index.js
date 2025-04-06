@@ -13,6 +13,7 @@ import teamMemberRoute from "./routes/teamMemberRoute.js"
 import contactRoute from "./routes/contactRoutes.js"
 import companyRoute from "./routes/companyRoutes.js"
 import productRoute from "./routes/productRoutes.js"
+import noteRoute from "./routes/noteRoutes.js"
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -64,6 +65,7 @@ app.use("/api/team-member", teamMemberRoute);
 app.use("/api/contact", contactRoute);
 app.use("/api/company", companyRoute);
 app.use("/api/product", productRoute);
+app.use("/api/note", noteRoute);
 
 // app.get("/razorpay", (req, res) => {
 //   res.render("razorpay"); // Render the Razorpay button

@@ -4,9 +4,10 @@ import {
     updateContact,
     getContacts,
     getDeletedContacts,
-    deleteContact,
+    updateStatus,
     searchContactsByName,
-    getContactById
+    getContactById,
+    getOwnedContacts
 } from "../controllers/contactController.js";
 import { isAdmin } from "../middlewares/authMiddleware.js";
 
@@ -16,8 +17,10 @@ router.post("/", createContact);
 router.put("/:id", updateContact);
 router.get("/", getContacts);
 router.get("/deleted", getDeletedContacts);
-router.put("/update-status/:id",isAdmin, deleteContact);
+router.put("/update-status/:id",isAdmin, updateStatus);
 router.get("/search", searchContactsByName);
+router.get("/getOwnedContacts", getOwnedContacts);
 router.get("/:id", getContactById);
+
 
 export default router;

@@ -18,7 +18,9 @@ export const createProduct = async (req, res) => {
         // 🔒 Check for duplicate name or code in the same organization
         const existingProduct = await Product.findOne({
             organization_id: teamMember.organization_id,
-            $or: [{ name }, { code }],
+            $or: [{ name }
+                // , { code }
+            ],
         });
 
         if (existingProduct) {
@@ -78,7 +80,7 @@ export const updateProduct = async (req, res) => {
                 organization_id: teamMember.organization_id,
                 $or: [
                     updateData.name ? { name: updateData.name } : {},
-                    updateData.code ? { code: updateData.code } : {},
+                    // updateData.code ? { code: updateData.code } : {},
                 ],
             });
 
@@ -285,3 +287,26 @@ export const searchProductsByCategory = async (req, res) => {
     }
 };
 
+// Get products Owned by Logged-In Team Member
+export const getOwnedProducts = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        if (!token) return res.status(401).json({ success: false, message: "Token missing" });
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        if (!teamMember || teamMember.status !== 1)
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+
+        const products = await Product.find({
+            organization_id: teamMember.organization_id,
+            owner_id: teamMember._id,
+            status: 1, // only active contacts
+        });
+
+        res.json({ success: true, products });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
