@@ -16,7 +16,7 @@ router.post("/", createContact);
 router.put("/:id", updateContact);
 router.get("/", getContacts);
 router.get("/deleted", getDeletedContacts);
-router.put("/delete/:id",isAdmin, deleteContact);
+router.put("/update-status/:id",isAdmin, deleteContact);
 router.get("/search", searchContactsByName);
 router.get("/:id", getContactById);
 

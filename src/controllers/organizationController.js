@@ -59,7 +59,7 @@ export const verifyOrganizationOTP = async (req, res) => {
 // Step 3: Create Organization (only if email verified)
 export const createOrganization = async (req, res) => {
     try {
-        const { name, email, password, pinCode, address } = req.body;
+        const { name, email, password, pinCode, address , gstNo , website } = req.body;
 
         const isVerified = await VerifiedOrganizationModel.findOne({ email });
         if (!isVerified) return res.status(400).json({ success: false, message: "Email not verified" });
@@ -73,6 +73,8 @@ export const createOrganization = async (req, res) => {
             password,
             pinCode,
             address,
+            website,
+            gstNo,
             plan_id: null,
             plan_expire_date: null,
         });
@@ -179,7 +181,7 @@ export const loginOrganization = async (req, res) => {
 export const editOrganization = async (req, res) => {
     try {
         const { id: organizationId } = req.params;
-        const { name, password, pinCode, address, status } = req.body;
+        const { name, password, pinCode, address, status,website,gstNo } = req.body;
 
         // ✅ Ensure the logged-in organization is trying to edit its own data
         if (organizationId !== req.user.id) {
@@ -201,6 +203,8 @@ export const editOrganization = async (req, res) => {
         if (name) organization.name = name;
         if (pinCode) organization.pinCode = pinCode;
         if (address) organization.address = address;
+        if (website) organization.website = website;
+        if (gstNo) organization.gstNo = gstNo;
         if (typeof status !== "undefined") organization.status = status;
 
         // ✅ Hash password if provided

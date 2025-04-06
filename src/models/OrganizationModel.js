@@ -48,6 +48,14 @@ const organizationSchema = new mongoose.Schema(
             enum: [0, 1], // 0 = Deleted (Inactive), 1 = Active
             default: 1,
         },
+        gstNo: {
+            type: String,
+            trim: true,
+        },
+        website: {
+            type: String,
+            trim: true,
+        }
     },
     { timestamps: true }
 );

@@ -151,6 +151,24 @@ export const updateCompany = async (req, res) => {
             return res.status(403).json({ success: false, message: "Company not found" });
         }
 
+        // 🔒 Check for uniqueness of name and code within the same organization
+        if (updateData.name) {
+            const duplicateProduct = await Company.findOne({
+                _id: { $ne: id },
+                organization_id: teamMember.organization_id,
+                $or: [
+                    updateData.name ? { name: updateData.name } : {},
+                ],
+            });
+
+            if (duplicateProduct) {
+                return res.status(400).json({
+                    success: false,
+                    message: "company already exists in your organization",
+                });
+            }
+        }
+
         updateData.updatedBy = teamMember._id;
 
         const updatedCompany = await Company.findByIdAndUpdate(id, updateData, { new: true });

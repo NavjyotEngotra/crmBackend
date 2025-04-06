@@ -1,0 +1,243 @@
+import Product from "../models/ProductModel.js";
+import TeamMember from "../models/TeamMemberModel.js";
+import jwt from "jsonwebtoken";
+
+// Create Product
+export const createProduct = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        if (!teamMember || teamMember.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const { name, code, category, price, description, owner_id } = req.body;
+
+        // 🔒 Check for duplicate name or code in the same organization
+        const existingProduct = await Product.findOne({
+            organization_id: teamMember.organization_id,
+            $or: [{ name }, { code }],
+        });
+
+        if (existingProduct) {
+            return res.status(400).json({
+                success: false,
+                message: "Product with the same name or code already exists in your organization",
+            });
+        }
+
+        const newProduct = new Product({
+            organization_id: teamMember.organization_id,
+            name,
+            code,
+            category,
+            price,
+            description,
+            owner_id,
+            createdBy: teamMember._id,
+            updatedBy: teamMember._id,
+        });
+
+        await newProduct.save();
+
+        res.status(201).json({
+            success: true,
+            message: "Product created successfully",
+            product: newProduct,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Update Product
+export const updateProduct = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        if (!teamMember || teamMember.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const { id } = req.params;
+        const updateData = { ...req.body };
+
+        const product = await Product.findById(id);
+        if (!product || product.organization_id.toString() !== teamMember.organization_id.toString()) {
+            return res.status(404).json({ success: false, message: "Product not found" });
+        }
+
+        // 🔒 Check for uniqueness of name and code within the same organization
+        if (updateData.name || updateData.code) {
+            const duplicateProduct = await Product.findOne({
+                _id: { $ne: id },
+                organization_id: teamMember.organization_id,
+                $or: [
+                    updateData.name ? { name: updateData.name } : {},
+                    updateData.code ? { code: updateData.code } : {},
+                ],
+            });
+
+            if (duplicateProduct) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Another product with the same name or code already exists in your organization",
+                });
+            }
+        }
+
+        delete updateData.organization_id;
+        delete updateData.status;
+
+        updateData.updatedBy = teamMember._id;
+
+        const updatedProduct = await Product.findByIdAndUpdate(id, updateData, { new: true });
+
+        res.json({ success: true, message: "Product updated", product: updatedProduct });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Get All Products (active)
+export const getProducts = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        const products = await Product.find({
+            organization_id: teamMember.organization_id,
+            status: 1,
+        }).sort({ createdAt: -1 });
+
+        res.json({ success: true, products });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Get Deleted Products
+export const getDeletedProducts = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        const products = await Product.find({
+            organization_id: teamMember.organization_id,
+            status: 0,
+        });
+
+        res.json({ success: true, products });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Soft Delete Product
+export const updateStatus = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        const { id } = req.params;
+
+        const product = await Product.findById(id);
+        if (!product || product.organization_id.toString() !== teamMember.organization_id.toString())
+            return res.status(404).json({ success: false, message: "Product not found" });
+        const {status} = req.body ;
+        product.status = status;
+        product.updatedBy = teamMember._id;
+
+        await product.save();
+        res.json({ success: true, message: "Product deleted", product });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Get Product by ID
+export const getProductById = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        const { id } = req.params;
+
+        const product = await Product.findById(id);
+
+        if (!product || product.organization_id.toString() !== teamMember.organization_id.toString()) {
+            return res.status(403).json({ success: false, message: "Product not found" });
+        }
+
+        res.json({ success: true, product });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Search Product by Name
+export const searchProductsByName = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        if (!teamMember || teamMember.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const { name } = req.query;
+
+        if (!name || name.trim() === "") {
+            return res.status(400).json({ success: false, message: "Product name is required" });
+        }
+
+        const products = await Product.find({
+            organization_id: teamMember.organization_id,
+            // status: 1, // Only active products
+            name: { $regex: name, $options: "i" }, // Case-insensitive search
+        });
+
+        res.json({ success: true, products });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Search Product by Category
+export const searchProductsByCategory = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
+
+        if (!teamMember || teamMember.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const { category } = req.query;
+
+        if (!category || category.trim() === "") {
+            return res.status(400).json({ success: false, message: "Category is required" });
+        }
+
+        const products = await Product.find({
+            organization_id: teamMember.organization_id,
+            status: 1, // Only active products
+            category: { $regex: category, $options: "i" }, // Case-insensitive search
+        });
+
+        res.json({ success: true, products });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
