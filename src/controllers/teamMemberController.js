@@ -7,7 +7,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import InviteToken from "../models/InviteTokenModel.js";
 import { sendEmail } from "../utilities/sendEmail.js";
-import { teamMemberPremissions } from "../constants.js";
+import { MODULE_PERMISSIONS } from "../constants.js";
 
 export const sendInvite = async (req, res) => {
     try {
@@ -203,7 +203,7 @@ export const loginTeamMember = async (req, res) => {
             message: "Login successful",
             token,
             teamMember: memberData,
-            permissions : teamMemberPremissions
+            permissions : MODULE_PERMISSIONS
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -385,7 +385,7 @@ export const superadminloginTeamMember = async (req, res) => {
             message: "Login successful",
             token,
             teamMember: memberData,
-            permissions : teamMemberPremissions
+            permissions : MODULE_PERMISSIONS
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

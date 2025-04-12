@@ -20,6 +20,12 @@ const companySchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
+        email: {
+            type: String,
+            lowercase: true,
+            trim: true,
+            match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        },
         address: {
             type: String,
             trim: true,

@@ -1,6 +1,7 @@
 import Company from "../models/CompanyModel.js";
 import TeamMember from "../models/TeamMemberModel.js";
 import jwt from "jsonwebtoken";
+import { getUserInfo } from "../utilities/getUserInfo.js";
 
 // Create Company
 export const createCompany = async (req, res) => {
@@ -12,7 +13,7 @@ export const createCompany = async (req, res) => {
         if (!teamMember || teamMember.status !== 1)
             return res.status(401).json({ success: false, message: "Unauthorized" });
 
-        const { name, description, address, pincode, website, gstNo, owner_id } = req.body;
+        const { name, description, address, pincode, website, gstNo, owner_id, email } = req.body;
 
         // Check for duplicate name in same organization
         const existingCompany = await Company.findOne({
@@ -33,6 +34,7 @@ export const createCompany = async (req, res) => {
             description,
             address,
             pincode,
+            email,
             website,
             gstNo,
             owner_id,
@@ -52,18 +54,21 @@ export const createCompany = async (req, res) => {
 export const getCompanies = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const teamMember = await TeamMember.findById(decoded.id);
+        const info = await getUserInfo(token);
+
+        if (!info || info.user.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
 
         const page = parseInt(req.query.page) || 1;
         const limit = 50;
         const skip = (page - 1) * limit;
 
         const [companies, total] = await Promise.all([
-            Company.find({ organization_id: teamMember.organization_id, status: 1 })
+            Company.find({ organization_id: (info.user.organization_id || info.user._id), status: 1 })
                 .skip(skip)
                 .limit(limit),
-            Company.countDocuments({ organization_id: teamMember.organization_id, status: 1 })
+            Company.countDocuments({ organization_id: (info.user.organization_id || info.user._id), status: 1 })
         ]);
 
         res.json({
@@ -85,20 +90,22 @@ export const getCompanies = async (req, res) => {
 export const getDeletedCompanies = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const teamMember = await TeamMember.findById(decoded.id);
+        const info = await getUserInfo(token);
+
+        if (!info || info.user.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
 
         const page = parseInt(req.query.page) || 1;
         const limit = 50;
         const skip = (page - 1) * limit;
 
         const [companies, total] = await Promise.all([
-            Company.find({ organization_id: teamMember.organization_id, status: 0 })
+            Company.find({ organization_id: (info.user.organization_id || info.user._id), status: 0 })
                 .skip(skip)
                 .limit(limit),
-            Company.countDocuments({ organization_id: teamMember.organization_id, status: 1 })
+            Company.countDocuments({ organization_id: (info.user.organization_id || info.user._id), status: 0 })
         ]);
-
         res.json({
             success: true,
             companies,
@@ -207,10 +214,9 @@ export const updateStatus = async (req, res) => {
 export const searchCompaniesByName = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const teamMember = await TeamMember.findById(decoded.id);
+        const info = await getUserInfo(token);
 
-        if (!teamMember || teamMember.status !== 1) {
+        if (!info || info.user.status !== 1) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
@@ -220,7 +226,7 @@ export const searchCompaniesByName = async (req, res) => {
         }
 
         const companies = await Company.find({
-            organization_id: teamMember.organization_id,
+            organization_id: info.user.organization_id || info.user._id,
             name: { $regex: name, $options: "i" }
         }).select("-__v");
 

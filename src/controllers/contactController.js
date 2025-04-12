@@ -2,6 +2,7 @@ import Contact from "../models/ContactModel.js";
 import Organization from "../models/OrganizationModel.js";
 import TeamMember from "../models/TeamMemberModel.js";
 import jwt from "jsonwebtoken";
+import { getUserInfo } from "../utilities/getUserInfo.js";
 
 // Create Contact
 export const createContact = async (req, res) => {
@@ -15,6 +16,18 @@ export const createContact = async (req, res) => {
 
         const organization = await Organization.findById(teamMember.organization_id);
         const { name, email, phoneno, owner_id,  title, company_id,  address, pincode } = req.body;
+
+            const existingCompany = await Contact.findOne({
+                    organization_id: teamMember.organization_id,
+                    email: email, // case-insensitive match
+                });
+        
+                if (existingCompany) {
+                    return res.status(409).json({
+                        success: false,
+                        message: "Contact with the same email already exists"
+                    });
+                }
 
         const newContact = new Contact({
             organization_id: organization._id,
@@ -55,6 +68,18 @@ export const updateContact = async (req, res) => {
         if (!contact || contact.organization_id.toString() !== organization._id.toString())
             return res.status(404).json({ success: false, message: "Contact not found" });
 
+        const existingCompany = await Contact.findOne({
+            organization_id: teamMember.organization_id,
+            email: updateData.email, // case-insensitive match
+        });
+
+        if (existingCompany) {
+            return res.status(409).json({
+                success: false,
+                message: "Contact with the same email already exists"
+            });
+        }
+
         //  Prevent organization_id from being updated
         delete updateData.organization_id;
         delete updateData.status;
@@ -71,10 +96,12 @@ export const updateContact = async (req, res) => {
 // Get all active contacts (paginated)
 export const getContacts = async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const teamMember = await TeamMember.findById(decoded.id);
-        const organization = await Organization.findById(teamMember.organization_id);
+          const token = req.headers.authorization?.split(" ")[1];
+           const info = await getUserInfo(token);
+   
+           if (!info || info.user.status !== 1) {
+               return res.status(401).json({ success: false, message: "Unauthorized" });
+           }
 
 
         const page = parseInt(req.query.page) || 1;
@@ -82,7 +109,7 @@ export const getContacts = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const contacts = await Contact.find({
-            organization_id: organization._id,
+            organization_id: info.user.organization_id||info.user.id,
             status: 1
         })
         .skip(skip)
@@ -98,20 +125,28 @@ export const getContacts = async (req, res) => {
 export const getDeletedContacts = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const teamMember = await TeamMember.findById(decoded.id);
-        const organization = await Organization.findById(teamMember.organization_id);
+         const info = await getUserInfo(token);
+ 
+         if (!info || info.user.status !== 1) {
+             return res.status(401).json({ success: false, message: "Unauthorized" });
+         }
 
 
-        const contacts = await Contact.find({
-            organization_id: organization._id,
-            status: 0
-        });
+      const page = parseInt(req.query.page) || 1;
+      const limit = 50;
+      const skip = (page - 1) * limit;
 
-        res.json({ success: true, contacts });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
+      const contacts = await Contact.find({
+          organization_id: info.user.organization_id||info.user.id,
+          status: 0
+      })
+      .skip(skip)
+      .limit(limit);
+
+      res.json({ success: true, contacts });
+  } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 // Soft delete contact
@@ -146,12 +181,12 @@ export const updateStatus = async (req, res) => {
 export const searchContactsByName = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const teamMember = await TeamMember.findById(decoded.id);
+        const info = await getUserInfo(token);
 
-        if (!teamMember || teamMember.status !== 1) {
+        if (!info || info.user.status !== 1) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
+
 
         const { name } = req.query;
 
@@ -160,7 +195,7 @@ export const searchContactsByName = async (req, res) => {
         }
 
         const contacts = await Contact.find({
-            organization_id: teamMember.organization_id,
+            organization_id: info.user.organization_id || info.user.id,
             name: { $regex: name, $options: "i" }, // case-insensitive partial match
             status: 1, // only active
         }).select("-__v");

@@ -7,7 +7,9 @@ import OTPModel from "../models/OTPModel.js";
 import VerifiedOrganizationModel from "../models/VerifiedOrganizationModel.js";
 import { getOrganizationDetails } from "../utilities/getOrganizationDetails.js";
 import TeamMember from "../models/TeamMemberModel.js";
-import { organizationPremissions } from "../constants.js";
+import { MODULE_PERMISSIONS } from "../constants.js";
+import ContactModel from "../models/ContactModel.js";
+import CompanyModel from "../models/CompanyModel.js";
 
 // Step 1: Send OTP
 export const sendOrganizationOTP = async (req, res) => {
@@ -91,27 +93,40 @@ export const createOrganization = async (req, res) => {
     }
 };
 
-
-//  Get All Organizations
 export const getOrganizations = async (req, res) => {
     try {
-        // Get the page number from the query params (default to 1)
         const page = parseInt(req.query.page) || 1;
         const limit = 25;
         const skip = (page - 1) * limit;
 
-        // Fetch organizations with pagination and populate the plan_id
         const organizations = await Organization.find()
             .populate("plan_id")
             .skip(skip)
             .limit(limit);
 
-        // Get the total number of organizations
+        // Use Promise.all to efficiently get counts in parallel
+        const organizationsWithCounts = await Promise.all(
+            organizations.map(async (org) => {
+                const [teamMemberCount, contactCount, companyCount] = await Promise.all([
+                    TeamMember.countDocuments({ organization_id: org._id, status: 1 }),
+                    ContactModel.countDocuments({ organization_id: org._id, status: 1 }),
+                    CompanyModel.countDocuments({ organization_id: org._id, status: 1 }),
+                ]);
+
+                return {
+                    ...org.toObject(),
+                    activeTeamMembers: teamMemberCount,
+                    activeContacts: contactCount,
+                    activeCompanies: companyCount,
+                };
+            })
+        );
+
         const totalOrganizations = await Organization.countDocuments();
 
         res.json({
             success: true,
-            organizations,
+            organizations: organizationsWithCounts,
             currentPage: page,
             totalPages: Math.ceil(totalOrganizations / limit),
             totalOrganizations,
@@ -182,7 +197,7 @@ export const loginOrganization = async (req, res) => {
         const token = generateOrganizationToken(organization._id);
         const orgData = organization.toObject();
         delete orgData.password;
-        res.json({ success: true, message: "Login successful", token, organization:orgData,premissions:organizationPremissions });
+        res.json({ success: true, message: "Login successful", token, organization:orgData,premissions:MODULE_PERMISSIONS });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -338,7 +353,7 @@ export const superadminloginOrganization = async (req, res) => {
         const token = generateOrganizationToken(organization._id);
         const orgData = organization.toObject();
         delete orgData.password;
-        res.json({ success: true, message: "Login successful", token, organization:orgData, premissions:organizationPremissions });
+        res.json({ success: true, message: "Login successful", token, organization:orgData, premissions:MODULE_PERMISSIONS });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

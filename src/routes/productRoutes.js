@@ -9,13 +9,12 @@ import {
     searchProductsByName,
     searchProductsByCategory,
     getOwnedProducts
-} from "../controllers/productController.js";
-import { isAdmin } from "../middlewares/authMiddleware.js";
+} from "../controllers/productControllerOrgSpecific.js";
 
 const router = express.Router();
 
 router.post("/", createProduct);
-router.put("/update-status/:id", isAdmin ,updateStatus);
+router.put("/update-status/:id" ,updateStatus);
 router.put("/:id", updateProduct);
 router.get("/", getProducts);
 router.get("/getOwnedProducts", getOwnedProducts);
