@@ -1,41 +1,93 @@
 import TeamMember from "../models/TeamMemberModel.js";
+import Organization from "../models/OrganizationModel.js";
 import { getOrganizationDetails } from "../utilities/getOrganizationDetails.js"
 import {generateToken} from "../utilities/generateToken.js"
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import Organization from "../models/OrganizationModel.js";
+import crypto from "crypto";
+import InviteToken from "../models/InviteTokenModel.js";
+import { sendEmail } from "../utilities/sendEmail.js";
+import { teamMemberPremissions } from "../constants.js";
 
-export const createTeamMember = async (req, res) => {
+export const sendInvite = async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(" ")[1];
-        const organization = await getOrganizationDetails(token);
+    const { email,role } = req.body;
+    const jwttoken = req.headers.authorization?.split(" ")[1];
+     const decoded = jwt.verify(jwttoken, process.env.JWT_SECRET);
+     const {_id:organization_id} = await Organization.findById(decoded.id);
+    if(!organization_id){
+        return res.status(401).json({ message: "Unauthorised" });
+    }
+        // Check if email already exists in TeamMember or Organization
+        const [existingTeamMember, existingOrg] = await Promise.all([
+            TeamMember.findOne({ email }),
+            Organization.findOne({ email }),
+        ]);
 
-        const { name, password, role } = req.body;
-
-        // Check if name already exists for this organization
-        const existing = await TeamMember.findOne({
-            organization_id: organization._id,
-            name: name.trim()
-        });
-
-        if (existing) {
-            return res.status(400).json({ success: false, message: "Team member username must be unique within the organization" });
+        if (existingTeamMember || existingOrg) {
+            return res.status(400).json({ message: "Email already registered in the system" });
         }
 
-        const newMember = new TeamMember({
-            name: name.trim(),
-            password,
+        const organization = await Organization.findById(organization_id);
+        if (!organization) return res.status(404).json({ message: "Organization not found" });
+
+        // Generate unique token
+        const token = crypto.randomBytes(20).toString("hex");
+
+        // Save token
+        await InviteToken.create({
+            email,
+            token,
             role,
-            organization_id: organization._id,
+            organization_id,
+            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24hr expiry
         });
 
-        await newMember.save();
-        res.status(201).json({ success: true, message: "Team member created", newMember });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        const inviteUrl = `${process.env.FRONTEND_URL}/register?token=${token}`;
+        const message = `You have been invited to join ${organization.name}.\n\nRegister here: ${inviteUrl}`;
+
+        await sendEmail(email, "You're Invited!", message);
+
+        res.status(200).json({ message: "Invite sent successfully" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json( err );
     }
 };
 
+export const registerWithToken = async (req, res) => {
+    const { token, name, email, password } = req.body;
+    if(!token || !name || !email || !password)
+        return res.status(400).json({ message: "Invalid data" });
+    try {
+        const invite = await InviteToken.findOne({ token, email });
+
+        if (!invite || invite.expiresAt < Date.now()) {
+            return res.status(400).json({ message: "Invalid or expired token" });
+        }
+
+        const existing = await TeamMember.findOne({ email });
+        const existingOrg = await Organization.findOne({ email });
+        if (existing||existingOrg) {
+            return res.status(400).json({ message: "Email already registered" });
+        }
+
+        const teamMember = new TeamMember({
+            name,
+            email,
+            password,
+            role:invite.role,
+            organization_id: invite.organization_id,
+        });
+
+        await teamMember.save();
+        await InviteToken.deleteOne({ _id: invite._id });
+
+        res.status(201).json({ message: "Team member registered successfully" });
+    } catch (err) {
+        res.status(500).json( err);
+    }
+};
 
 export const editTeamMemberProfile = async (req, res) => {
     try {
@@ -45,10 +97,9 @@ export const editTeamMemberProfile = async (req, res) => {
         const teamMember = await TeamMember.findById(decoded.id);
         if (!teamMember || teamMember.status !== 1) return res.status(404).json({ message: "User not found" });
 
-        const {email, phone, domainName ,full_name , password } = req.body;
+        const { phone, domainName ,name, password } = req.body;
         if (phone) teamMember.phone = phone;
-        if (email) teamMember.email = email;
-        if (full_name) teamMember.full_name = full_name;
+        if (name) teamMember.email = name;
         if (domainName) teamMember.domainName = domainName;
         if (password) teamMember.password = password;
 
@@ -125,10 +176,10 @@ export const getDeletedTeamMembers = async (req, res) => {
 
 export const loginTeamMember = async (req, res) => {
     try {
-        const { name, password } = req.body;
+        const { email, password } = req.body;
 
         // Find active team member by email
-        const teamMember = await TeamMember.findOne({ name, status: 1 }).select("+password");
+        const teamMember = await TeamMember.findOne({ email, status: 1 }).select("+password");
 
         if (!teamMember) {
             return res.status(404).json({ success: false, message: "Team member not found or inactive" });
@@ -152,6 +203,7 @@ export const loginTeamMember = async (req, res) => {
             message: "Login successful",
             token,
             teamMember: memberData,
+            permissions : teamMemberPremissions
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -311,6 +363,30 @@ export const getOrganization = async (req, res) => {
         delete orgData._id;
 
         res.json({ success: true, organization: orgData });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const superadminloginTeamMember = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const teamMember = await TeamMember.findById(id)
+
+        // Generate token
+        const token = generateToken(teamMember._id);
+
+        // Remove password from response
+        const memberData = teamMember.toObject();
+        delete memberData.password;
+
+        res.json({
+            success: true,
+            message: "Login successful",
+            token,
+            teamMember: memberData,
+            permissions : teamMemberPremissions
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

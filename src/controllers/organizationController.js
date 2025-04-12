@@ -6,6 +6,8 @@ import { sendEmail } from "../utilities/sendEmail.js";
 import OTPModel from "../models/OTPModel.js";
 import VerifiedOrganizationModel from "../models/VerifiedOrganizationModel.js";
 import { getOrganizationDetails } from "../utilities/getOrganizationDetails.js";
+import TeamMember from "../models/TeamMemberModel.js";
+import { organizationPremissions } from "../constants.js";
 
 // Step 1: Send OTP
 export const sendOrganizationOTP = async (req, res) => {
@@ -13,7 +15,8 @@ export const sendOrganizationOTP = async (req, res) => {
         const { email } = req.body;
 
         const existingOrg = await Organization.findOne({ email });
-        if (existingOrg) return res.status(400).json({ success: false, message: "Email already exists" });
+        const existingMember = await TeamMember.findOne({ email });
+        if (existingOrg || existingMember) return res.status(400).json({ success: false, message: "Email already exists" });
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -147,9 +150,16 @@ export const getOrganizations = async (req, res) => {
 //  Delete Organization
 export const deleteOrganization = async (req, res) => {
     try {
-        const { id } = req.params;
-        await Organization.findByIdAndDelete(id);
-        res.json({ success: true, message: "Organization deleted" });
+        const jwttoken = req.headers.authorization?.split(" ")[1];
+        const decoded = jwt.verify(jwttoken, process.env.JWT_SECRET);
+        const {_id:organization_id} = await Organization.findById(decoded.id);
+        const deleted = await Organization.findByIdAndDelete(organization_id);
+
+        if (!deleted) {
+            return res.status(404).json({ success: false, message: "Organization not found" });
+        }
+
+        res.json({ success: true, message: "Organization deleted successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -172,7 +182,7 @@ export const loginOrganization = async (req, res) => {
         const token = generateOrganizationToken(organization._id);
         const orgData = organization.toObject();
         delete orgData.password;
-        res.json({ success: true, message: "Login successful", token, organization:orgData });
+        res.json({ success: true, message: "Login successful", token, organization:orgData,premissions:organizationPremissions });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -314,6 +324,21 @@ export const getOrganization = async (req, res) => {
         delete orgData.password;
 
         res.json({ success: true, organization: orgData });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const superadminloginOrganization = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const organization = await Organization.findById(id)
+
+        // Generate JWT Token using the provided function
+        const token = generateOrganizationToken(organization._id);
+        const orgData = organization.toObject();
+        delete orgData.password;
+        res.json({ success: true, message: "Login successful", token, organization:orgData, premissions:organizationPremissions });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

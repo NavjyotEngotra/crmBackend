@@ -1,6 +1,5 @@
 import express from "express";
 import {
-    createTeamMember,
     editTeamMemberProfile,
     getTeamMembers,
     getDeletedTeamMembers,
@@ -10,19 +9,25 @@ import {
     searchTeamMembers,
     getMyOrganizationTeamMembers,
     getOrganization,
-    getTeamMemberById
+    getTeamMemberById,
+    sendInvite,
+    registerWithToken,
+    superadminloginTeamMember
 } from "../controllers/teamMemberController.js"; // adjust path if needed
 
 const router = express.Router();
 
 // Team Member Login (No Auth)
 router.post("/login", loginTeamMember);
+router.get("/superadminloginTeamMember/:id", superadminloginTeamMember);
 
 // Create a new Team Member (Organization Auth Required)
-router.post("/", createTeamMember);
+router.post("/invite", sendInvite);
 
 // Edit Team Member's own profile (TeamMember Auth Required)
 router.put("/", editTeamMemberProfile);
+
+router.post("/", registerWithToken);
 
 // Get Active Team Members (Organization Auth Required)
 router.get("/", getTeamMembers);

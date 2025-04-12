@@ -37,17 +37,7 @@ const productSchema = new mongoose.Schema(
             type: Number,
             enum: [0, 1], // 0 = deleted, 1 = active
             default: 1,
-        },
-        createdBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "TeamMember",
-            required: true,
-        },
-        updatedBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "TeamMember",
-            required: true,
-        },
+        }, 
     },
     { timestamps: true }
 );
