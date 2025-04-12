@@ -275,29 +275,50 @@ export const getProducts = async (req, res) => {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
-        const page = parseInt(req.query.page) || 1;
-        const limit = 50;
+        const organizationId = info.user.organization_id || info.user._id;
+
+        // Get by ID if provided
+        const productId = req.query.id;
+        if (productId) {
+            const product = await Product.findOne({ _id: productId, organization_id: organizationId });
+            if (!product) {
+                return res.status(404).json({ success: false, message: "Product not found" });
+            }
+            return res.json({ success: true, product });
+        }
+
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(parseInt(req.query.limit) || 50, 100);
         const skip = (page - 1) * limit;
 
-        const products = await Product.find({
-            organization_id: info.user.organization_id || info.user._id,
-            status: 1,
-        })
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit);
+        const status = req.query.status !== undefined ? parseInt(req.query.status) : 1;
+        const search = req.query.search?.trim();
 
-        const totalCount = await Product.countDocuments({
-            organization_id: info.user.organization_id || info.user._id,
-            status: 1,
-        });
+        const query = { organization_id: organizationId };
+        if (!isNaN(status)) query.status = status;
+        if (search) query.name = { $regex: search, $options: "i" };
+
+        const [products, totalCount] = await Promise.all([
+            Product.find(query)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Product.countDocuments(query)
+        ]);
+
+        const totalPages = Math.ceil(totalCount / limit);
 
         res.json({
             success: true,
-            currentPage: page,
-            totalPages: Math.ceil(totalCount / limit),
-            totalDeletedProducts: totalCount,
             products,
+            pagination: {
+                total: totalCount,
+                page,
+                limit,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1,
+            }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

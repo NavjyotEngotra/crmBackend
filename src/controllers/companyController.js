@@ -50,7 +50,6 @@ export const createCompany = async (req, res) => {
     }
 };
 
-// Get all active companies (paginated)
 export const getCompanies = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -60,16 +59,36 @@ export const getCompanies = async (req, res) => {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
-        const page = parseInt(req.query.page) || 1;
-        const limit = 50;
+        const organizationId = info.user.organization_id || info.user._id;
+
+        // Get by ID
+        const companyId = req.query.id;
+        if (companyId) {
+            const company = await Company.findOne({ _id: companyId, organization_id: organizationId });
+            if (!company) {
+                return res.status(404).json({ success: false, message: "Company not found" });
+            }
+            return res.json({ success: true, company });
+        }
+
+        // Filters and pagination
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(parseInt(req.query.limit) || 50, 100);
         const skip = (page - 1) * limit;
 
+        const status = req.query.status !== undefined ? parseInt(req.query.status) : 1;
+        const search = req.query.search?.trim();
+
+        const query = { organization_id: organizationId };
+        if (!isNaN(status)) query.status = status;
+        if (search) query.name = { $regex: search, $options: "i" };
+
         const [companies, total] = await Promise.all([
-            Company.find({ organization_id: (info.user.organization_id || info.user._id), status: 1 })
-                .skip(skip)
-                .limit(limit),
-            Company.countDocuments({ organization_id: (info.user.organization_id || info.user._id), status: 1 })
+            Company.find(query).skip(skip).limit(limit),
+            Company.countDocuments(query)
         ]);
+
+        const totalPages = Math.ceil(total / limit);
 
         res.json({
             success: true,
@@ -77,8 +96,10 @@ export const getCompanies = async (req, res) => {
             pagination: {
                 total,
                 page,
-                totalPages: Math.ceil(total / limit),
-                hasNextPage: skip + companies.length < total,
+                limit,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1,
             }
         });
     } catch (error) {

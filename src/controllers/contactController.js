@@ -93,29 +93,58 @@ export const updateContact = async (req, res) => {
     }
 };
 
-// Get all active contacts (paginated)
 export const getContacts = async (req, res) => {
     try {
-          const token = req.headers.authorization?.split(" ")[1];
-           const info = await getUserInfo(token);
-   
-           if (!info || info.user.status !== 1) {
-               return res.status(401).json({ success: false, message: "Unauthorized" });
-           }
+        const token = req.headers.authorization?.split(" ")[1];
+        const info = await getUserInfo(token);
 
+        if (!info || info.user.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
 
-        const page = parseInt(req.query.page) || 1;
-        const limit = 50;
+        const organizationId = info.user.organization_id || info.user.id;
+
+        // Get by ID
+        const contactId = req.query.id;
+        if (contactId) {
+            const contact = await Contact.findOne({ _id: contactId, organization_id: organizationId });
+            if (!contact) {
+                return res.status(404).json({ success: false, message: "Contact not found" });
+            }
+            return res.json({ success: true, contact });
+        }
+
+        // Pagination and filters
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(parseInt(req.query.limit) || 50, 100);
         const skip = (page - 1) * limit;
 
-        const contacts = await Contact.find({
-            organization_id: info.user.organization_id||info.user.id,
-            status: 1
-        })
-        .skip(skip)
-        .limit(limit);
+        const status = req.query.status !== undefined ? parseInt(req.query.status) : 1;
+        const search = req.query.search?.trim();
 
-        res.json({ success: true, contacts });
+        const query = { organization_id: organizationId };
+        if (!isNaN(status)) query.status = status;
+        if (search) query.name = { $regex: search, $options: "i" };
+
+        const [contacts, totalCount] = await Promise.all([
+            Contact.find(query).skip(skip).limit(limit),
+            Contact.countDocuments(query)
+        ]);
+
+        const totalPages = Math.ceil(totalCount / limit);
+
+        res.json({
+            success: true,
+            contacts,
+            pagination: {
+                total: totalCount,
+                page,
+                limit,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1,
+            }
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

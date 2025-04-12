@@ -1,7 +1,7 @@
 import Organization from "../models/OrganizationModel.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { generateOrganizationToken } from "../utilities/generateToken.js";
+import { generateOrganizationToken, generateToken } from "../utilities/generateToken.js";
 import { sendEmail } from "../utilities/sendEmail.js";
 import OTPModel from "../models/OTPModel.js";
 import VerifiedOrganizationModel from "../models/VerifiedOrganizationModel.js";
@@ -95,16 +95,34 @@ export const createOrganization = async (req, res) => {
 
 export const getOrganizations = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = 25;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(parseInt(req.query.limit) || 25, 100); // limit capped at 100
         const skip = (page - 1) * limit;
 
-        const organizations = await Organization.find()
-            .populate("plan_id")
-            .skip(skip)
-            .limit(limit);
+        const search = req.query.search?.trim();
+        const status = req.query.status !== undefined ? parseInt(req.query.status) : undefined;
+        const id = req.query.id?.trim();
 
-        // Use Promise.all to efficiently get counts in parallel
+        const query = {};
+        if (id) {
+            query._id = id;
+        } else {
+            if (search) {
+                query.name = { $regex: search, $options: "i" };
+            }
+            if (!isNaN(status)) {
+                query.status = status;
+            }
+        }
+
+        const [organizations, totalOrganizations] = await Promise.all([
+            Organization.find(query)
+                .populate("plan_id")
+                .skip(skip)
+                .limit(limit),
+            Organization.countDocuments(query)
+        ]);
+
         const organizationsWithCounts = await Promise.all(
             organizations.map(async (org) => {
                 const [teamMemberCount, contactCount, companyCount] = await Promise.all([
@@ -122,14 +140,16 @@ export const getOrganizations = async (req, res) => {
             })
         );
 
-        const totalOrganizations = await Organization.countDocuments();
+        const totalPages = Math.ceil(totalOrganizations / limit);
 
         res.json({
             success: true,
             organizations: organizationsWithCounts,
             currentPage: page,
-            totalPages: Math.ceil(totalOrganizations / limit),
+            totalPages,
             totalOrganizations,
+            hasNextPage: page < totalPages,
+            hasPreviousPage: page > 1
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -229,13 +249,10 @@ export const editOrganization = async (req, res) => {
         if (pinCode) organization.pinCode = pinCode;
         if (address) organization.address = address;
         if (website) organization.website = website;
+        if (password) organization.password = password;
         if (gstNo) organization.gstNo = gstNo;
         if (typeof status !== "undefined") organization.status = status;
 
-        // ✅ Hash password if provided
-        if (password) {
-            organization.password = await bcrypt.hash(password, 10);
-        }
 
         await organization.save();
 
@@ -266,62 +283,83 @@ export const searchOrganizations = async (req, res) => {
 };
 
 
-//  Forgot Password (Send Reset Link)
 export const forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
 
-        // Check if the organization exists
+        // Check if email exists
         const organization = await Organization.findOne({ email });
-        if (!organization) {
-            return res.status(404).json({ success: false, message: "Organization not found" });
+        const teamMember = await TeamMember.findOne({ email });
+
+        if (!organization && !teamMember) {
+            return res.status(404).json({ success: false, message: "Email not found" });
         }
 
-        // Generate Reset Token
-        const resetToken = jwt.sign({ id: organization._id }, process.env.JWT_RESET_SECRET, {
-            expiresIn: process.env.RESET_TOKEN_EXPIRES_IN,
-        });
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // Reset URL
-        const resetUrl = `${req.protocol}://${req.get("host")}/api/auth/reset-password/${resetToken}`;
-
-        // Send the reset password email
-        let a = await sendEmail(
-            email,
-            "Password Reset Request",
-            `Please click the link to reset your password: ${resetUrl}`
+        // Save or update OTP in DB (overwrite if exists)
+        await OTPModel.findOneAndUpdate(
+            { email },
+            { otp, createdAt: new Date() },
+            { upsert: true, new: true }
         );
 
-        if(!a){
-            return res.status(500).json({ success: false, message: "Something went wrong" });
+        // Send OTP via email
+        const sent = await sendEmail(
+            email,
+            "Your OTP for Password Reset",
+            `Your OTP is: ${otp}. It will expire in 5 minutes.`
+        );
+
+        if (!sent) {
+            return res.status(500).json({ success: false, message: "Failed to send OTP" });
         }
-        res.json({ success: true, message: "Password reset link sent to your email" });
+
+        res.json({ success: true, message: "OTP sent to your email" });
+
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
 
-//  Reset Password
 export const resetPassword = async (req, res) => {
     try {
-        const { token } = req.params;
-        const { password } = req.body;
+        const { email, otp, password } = req.body;
 
-        // Verify Token
-        const decoded = jwt.verify(token, process.env.JWT_RESET_SECRET);
-
-        // Find the organization by ID
-        const organization = await Organization.findById(decoded.id);
-        if (!organization) {
-            return res.status(404).json({ success: false, message: "Invalid or expired token" });
+        if (!email || !otp || !password) {
+            return res.status(400).json({ success: false, message: "Email, OTP, and password are required" });
         }
 
-        organization.password = password;
-        await organization.save();
+        // Verify OTP
+        const existingOtp = await OTPModel.findOne({ email, otp });
+        if (!existingOtp) {
+            return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+        }
+
+        // Reset password for organization or team member
+        const organization = await Organization.findOne({ email });
+        if (organization) {
+            organization.password = password;
+            await organization.save();
+        }
+
+        const teamMember = await TeamMember.findOne({ email });
+        if (teamMember) {
+            teamMember.password = password;
+            await teamMember.save();
+        }
+
+        if (!organization && !teamMember) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        // Delete OTP after use
+        await OTPModel.deleteOne({ email });
 
         res.json({ success: true, message: "Password reset successful" });
     } catch (error) {
-        res.status(500).json({ success: false, message: "Invalid or expired token" });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -359,3 +397,113 @@ export const superadminloginOrganization = async (req, res) => {
     }
 };
 
+export const commonLogin = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // First check in Organization
+        let user = await Organization.findOne({ email, status: 1 }).select("+password");
+        let token = null;
+        let role = "organization";
+
+        if (user) {
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) {
+                return res.status(401).json({ success: false, message: "Invalid credentials" });
+            }
+
+            token = generateOrganizationToken(user._id);
+            const userData = user.toObject();
+            delete userData.password;
+
+            return res.json({
+                success: true,
+                message: "Login successful",
+                token,
+                role,
+                organization: userData,
+                permissions: MODULE_PERMISSIONS
+            });
+        }
+
+        // If not found in Organization, check in TeamMember
+        user = await TeamMember.findOne({ email, status: 1 }).select("+password");
+        role = "teamMember";
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found or inactive" });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ success: false, message: "Invalid credentials" });
+        }
+
+        token = generateToken(user._id);
+        const userData = user.toObject();
+        delete userData.password;
+
+        res.json({
+            success: true,
+            message: "Login successful",
+            token,
+            role,
+            teamMember: userData,
+            permissions: MODULE_PERMISSIONS
+        });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+export const superadminCommonLogin = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Try to find the user in Organization collection
+        let user = await Organization.findById(id);
+        let role = "organization";
+        let token;
+
+        if (user) {
+            token = generateOrganizationToken(user._id);
+            const orgData = user.toObject();
+            delete orgData.password;
+
+            return res.json({
+                success: true,
+                message: "Login successful",
+                token,
+                role,
+                organization: orgData,
+                permissions: MODULE_PERMISSIONS
+            });
+        }
+
+        // If not found, try to find the user in TeamMember collection
+        user = await TeamMember.findById(id);
+        role = "teamMember";
+
+        if (user) {
+            token = generateToken(user._id);
+            const memberData = user.toObject();
+            delete memberData.password;
+
+            return res.json({
+                success: true,
+                message: "Login successful",
+                token,
+                role,
+                teamMember: memberData,
+                permissions: MODULE_PERMISSIONS
+            });
+        }
+
+        // If user not found in both
+        return res.status(404).json({ success: false, message: "User not found" });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

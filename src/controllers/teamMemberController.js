@@ -1,13 +1,14 @@
 import TeamMember from "../models/TeamMemberModel.js";
 import Organization from "../models/OrganizationModel.js";
 import { getOrganizationDetails } from "../utilities/getOrganizationDetails.js"
-import {generateToken} from "../utilities/generateToken.js"
+import { generateToken} from "../utilities/generateToken.js"
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import InviteToken from "../models/InviteTokenModel.js";
 import { sendEmail } from "../utilities/sendEmail.js";
 import { MODULE_PERMISSIONS } from "../constants.js";
+import { getUserInfo } from "../utilities/getUserInfo.js";
 
 export const sendInvite = async (req, res) => {
     try {
@@ -113,19 +114,45 @@ export const editTeamMemberProfile = async (req, res) => {
 export const getTeamMembers = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const organization = await getOrganizationDetails(token);
+        const info = await getUserInfo(token);
 
-        const page = parseInt(req.query.page) || 1;
-        const limit = 50;
+        if (!info?.user || info.user.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const organizationId = info.user.organization_id || info.user._id;
+
+        // Get by ID if 'id' is provided
+        const memberId = req.query.id;
+        if (memberId) {
+            const member = await TeamMember.findOne({ _id: memberId, organization_id: organizationId }).select("-password");
+            if (!member) {
+                return res.status(404).json({ success: false, message: "Team member not found" });
+            }
+            return res.json({ success: true, teamMember: member });
+        }
+
+        // Filters and pagination
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(parseInt(req.query.limit) || 25, 100);
         const skip = (page - 1) * limit;
 
+        const status = req.query.status !== undefined ? parseInt(req.query.status) : undefined;
+        const search = req.query.search?.trim();
+
+        const query = { organization_id: organizationId };
+        if (!isNaN(status)) query.status = status;
+        if (search) query.name = { $regex: search, $options: "i" };
+
         const [members, total] = await Promise.all([
-            TeamMember.find({ organization_id: organization._id, status: 1 })
+            TeamMember.find(query)
                 .select("-password")
                 .skip(skip)
                 .limit(limit),
-            TeamMember.countDocuments({ organization_id: organization._id, status: 1 })
+            TeamMember.countDocuments(query)
         ]);
+
+        const totalPages = Math.ceil(total / limit);
 
         res.json({
             success: true,
@@ -133,14 +160,17 @@ export const getTeamMembers = async (req, res) => {
             pagination: {
                 total,
                 page,
-                totalPages: Math.ceil(total / limit),
-                hasNextPage: skip + members.length < total,
+                limit,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1
             }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
 
 export const getDeletedTeamMembers = async (req, res) => {
     try {
@@ -338,16 +368,13 @@ export const getMyOrganizationTeamMembers = async (req, res) => {
 export const getOrganization = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        if (!token) return res.status(401).json({ success: false, message: "No token provided" });
+        const info = await getUserInfo(token);
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const teamMember = await TeamMember.findById(decoded.id);
-
-        if (!teamMember) {
-            return res.status(404).json({ success: false, message: "Team member not found" });
+        if (!info || info.user.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
-        const organization = await Organization.findById(teamMember.organization_id);
+        const organization = await Organization.findById(info.user.organization_id || info.user._id);
         if (!organization) {
             return res.status(404).json({ success: false, message: "Organization not found" });
         }
@@ -391,4 +418,3 @@ export const superadminloginTeamMember = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-
