@@ -7,17 +7,17 @@ import { getUserInfo } from "../utilities/getUserInfo.js";
 export const createCompany = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const teamMember = await TeamMember.findById(decoded.id);
+        const info = await getUserInfo(token);
 
-        if (!teamMember || teamMember.status !== 1)
+        if (!info || info.user.status !== 1) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
 
-        const { name, description, address, pincode, website, gstNo, owner_id, email } = req.body;
+        const { name, description, address, pincode, website, gstNo, owner_id, email ,phone } = req.body;
 
         // Check for duplicate name in same organization
         const existingCompany = await Company.findOne({
-            organization_id: teamMember.organization_id,
+            organization_id: info.user.organization_id || info.user._id,
             name: { $regex: new RegExp(`^${name}$`, 'i') }, // case-insensitive match
         });
 
@@ -29,7 +29,7 @@ export const createCompany = async (req, res) => {
         }
 
         const newCompany = new Company({
-            organization_id: teamMember.organization_id,
+            organization_id: info.user.organization_id || info.user._id,
             name,
             description,
             address,
@@ -37,9 +37,10 @@ export const createCompany = async (req, res) => {
             email,
             website,
             gstNo,
+            phone,
             owner_id,
-            createdBy: teamMember._id,
-            updatedBy: teamMember._id,
+            createdBy: info.user._id,
+            updatedBy: info.user._id,
         });
 
         await newCompany.save();
@@ -165,17 +166,19 @@ export const getCompanyById = async (req, res) => {
 export const updateCompany = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const teamMember = await TeamMember.findById(decoded.id);
+        const info = await getUserInfo(token);
+
+        if (!info || info.user.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
 
         const { id } = req.params;
         const updateData = { ...req.body };
         delete updateData.organization_id;
-        delete updateData.status;
 
         const company = await Company.findById(id);
 
-        if (!company || company.organization_id.toString() !== teamMember.organization_id.toString()) {
+        if (!company || company.organization_id.toString() !== (info.user.organization_id||info.user._id).toString()) {
             return res.status(403).json({ success: false, message: "Company not found" });
         }
 
@@ -183,7 +186,7 @@ export const updateCompany = async (req, res) => {
         if (updateData.name) {
             const duplicateProduct = await Company.findOne({
                 _id: { $ne: id },
-                organization_id: teamMember.organization_id,
+                organization_id: info.user.organization_id||info.user._id,
                 $or: [
                     updateData.name ? { name: updateData.name } : {},
                 ],
@@ -197,7 +200,7 @@ export const updateCompany = async (req, res) => {
             }
         }
 
-        updateData.updatedBy = teamMember._id;
+        updateData.updatedBy = info.user._id;
 
         const updatedCompany = await Company.findByIdAndUpdate(id, updateData, { new: true });
 

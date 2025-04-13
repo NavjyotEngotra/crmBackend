@@ -8,17 +8,17 @@ import { getUserInfo } from "../utilities/getUserInfo.js";
 export const createContact = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const teamMember = await TeamMember.findById(decoded.id);
+        const info = await getUserInfo(token);
 
-        if (!teamMember || teamMember.status !== 1)
+        if (!info || info.user.status !== 1) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
 
-        const organization = await Organization.findById(teamMember.organization_id);
-        const { name, email, phoneno, owner_id,  title, company_id,  address, pincode } = req.body;
+        const { name, phoneno, address, pincode, owner_id, email,company_id,title } = req.body;
+
 
             const existingCompany = await Contact.findOne({
-                    organization_id: teamMember.organization_id,
+                    organization_id: info.user.organization_id || info.user._id,
                     email: email, // case-insensitive match
                 });
         
@@ -30,7 +30,7 @@ export const createContact = async (req, res) => {
                 }
 
         const newContact = new Contact({
-            organization_id: organization._id,
+            organization_id: info.user.organization_id || info.user._id,
             name,
             email,
             phoneno,
@@ -39,8 +39,8 @@ export const createContact = async (req, res) => {
             company_id,
             address,
             pincode,
-            createdBy: teamMember._id,
-            updatedBy: teamMember._id,
+            createdBy: info.user._id,
+            updatedBy: info.user._id,
         });
 
         await newContact.save();
@@ -54,22 +54,21 @@ export const createContact = async (req, res) => {
 export const updateContact = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const teamMember = await TeamMember.findById(decoded.id);
+        const info = await getUserInfo(token);
 
-        if (!teamMember || teamMember.status !== 1)
+        if (!info || info.user.status !== 1) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
 
-        const organization = await Organization.findById(teamMember.organization_id);
         const { id } = req.params;
         const updateData = { ...req.body };
 
         const contact = await Contact.findById(id);
-        if (!contact || contact.organization_id.toString() !== organization._id.toString())
+        if (!contact || contact.organization_id.toString() !== (info.user.organization_id||info.user._id).toString())
             return res.status(404).json({ success: false, message: "Contact not found" });
 
         const existingCompany = await Contact.findOne({
-            organization_id: teamMember.organization_id,
+            organization_id: info.user.organization_id||info.user._id,
             email: updateData.email, // case-insensitive match
         });
 
@@ -82,9 +81,8 @@ export const updateContact = async (req, res) => {
 
         //  Prevent organization_id from being updated
         delete updateData.organization_id;
-        delete updateData.status;
 
-        updateData.updatedBy = teamMember._id;
+        updateData.updatedBy = info.user._id;
 
         const updatedContact = await Contact.findByIdAndUpdate(id, updateData, { new: true });
         res.json({ success: true, message: "Contact updated", contact: updatedContact });
