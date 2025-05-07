@@ -100,7 +100,7 @@ export const editTeamMemberProfile = async (req, res) => {
 
         const { phone, domainName ,name, password } = req.body;
         if (phone) teamMember.phone = phone;
-        if (name) teamMember.email = name;
+        if (name) teamMember.name = name;
         if (domainName) teamMember.domainName = domainName;
         if (password) teamMember.password = password;
 

@@ -33,6 +33,9 @@ const companySchema = new mongoose.Schema(
         pincode: {
             type: String,
         },
+        phone: {
+            type: String,
+        },
         status: {
             type: Number,
             enum: [0, 1], // 0 = deleted, 1 = active
