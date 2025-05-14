@@ -14,6 +14,7 @@ import contactRoute from "./routes/contactRoutes.js"
 import companyRoute from "./routes/companyRoutes.js"
 import productRoute from "./routes/productRoutes.js"
 import noteRoute from "./routes/noteRoutes.js"
+import categortRoute from "./routes/categoryRoute.js"
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -66,6 +67,8 @@ app.use("/api/contact", contactRoute);
 app.use("/api/company", companyRoute);
 app.use("/api/product", productRoute);
 app.use("/api/note", noteRoute);
+app.use("/api/category", categortRoute);
+
 
 // app.get("/razorpay", (req, res) => {
 //   res.render("razorpay"); // Render the Razorpay button

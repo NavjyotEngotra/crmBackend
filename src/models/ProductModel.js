@@ -17,9 +17,9 @@ const productSchema = new mongoose.Schema(
             required: true,
         },
         category: {
-            type: String,
-            enum: ["None", "Hardware", "Software"], // Customize as needed
-            default: "None",
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Category",
+            required: true,
         },
         price: {
             type: Number,
@@ -37,7 +37,7 @@ const productSchema = new mongoose.Schema(
             type: Number,
             enum: [0, 1], // 0 = deleted, 1 = active
             default: 1,
-        }, 
+        },
     },
     { timestamps: true }
 );

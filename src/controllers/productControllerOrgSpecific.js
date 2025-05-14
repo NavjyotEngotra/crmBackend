@@ -1,9 +1,9 @@
 import Product from "../models/ProductModel.js";
 import TeamMember from "../models/TeamMemberModel.js";
+import Category from "../models/CategoryModel.js"; // ✅ Import Category model
 import jwt from "jsonwebtoken";
 import { getUserInfo } from "../utilities/getUserInfo.js";
-
-
+import mongoose from "mongoose";
 
 // Create Product (only Organization)
 export const createProduct = async (req, res) => {
@@ -29,6 +29,12 @@ export const createProduct = async (req, res) => {
             });
         }
 
+        // ✅ Validate category exists
+        const validCategory = await Category.findById(category);
+        if (!validCategory) {
+            return res.status(400).json({ success: false, message: "Invalid category ID" });
+        }
+
         const newProduct = new Product({
             organization_id: info.user._id,
             name,
@@ -47,7 +53,7 @@ export const createProduct = async (req, res) => {
     }
 };
 
-// Update Product (only Organization)
+// Update Product
 export const updateProduct = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -84,6 +90,14 @@ export const updateProduct = async (req, res) => {
             }
         }
 
+        // ✅ Validate updated category if provided
+        if (updateData.category) {
+            const validCategory = await Category.findById(updateData.category);
+            if (!validCategory) {
+                return res.status(400).json({ success: false, message: "Invalid category ID" });
+            }
+        }
+
         delete updateData.organization_id;
         delete updateData.status;
 
@@ -95,7 +109,7 @@ export const updateProduct = async (req, res) => {
     }
 };
 
-// Soft Delete Product (only Organization)
+// Soft Delete
 export const updateStatus = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -123,7 +137,7 @@ export const updateStatus = async (req, res) => {
     }
 };
 
-// Get products Owned by Logged-In Team Member
+// Owned Products
 export const getOwnedProducts = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -138,8 +152,8 @@ export const getOwnedProducts = async (req, res) => {
         const products = await Product.find({
             organization_id: teamMember.organization_id,
             owner_id: teamMember._id,
-            status: 1, // only active contacts
-        });
+            status: 1,
+        }).populate("category"); // ✅ Populate category
 
         res.json({ success: true, products });
     } catch (error) {
@@ -147,7 +161,7 @@ export const getOwnedProducts = async (req, res) => {
     }
 };
 
-// Search Product by Category
+// ✅ Search by Category (expects ObjectId)
 export const searchProductsByCategory = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -158,16 +172,15 @@ export const searchProductsByCategory = async (req, res) => {
         }
 
         const { category } = req.query;
-
-        if (!category || category.trim() === "") {
-            return res.status(400).json({ success: false, message: "Category is required" });
+        if (!category || !mongoose.Types.ObjectId.isValid(category)) {
+            return res.status(400).json({ success: false, message: "Valid category ID is required" });
         }
 
         const products = await Product.find({
             organization_id: info.user.organization_id || info.user._id,
-            status: 1, // Only active products
-            category: { $regex: category, $options: "i" }, // Case-insensitive search
-        });
+            status: 1,
+            category,
+        }).populate("category");
 
         res.json({ success: true, products });
     } catch (error) {
@@ -175,7 +188,7 @@ export const searchProductsByCategory = async (req, res) => {
     }
 };
 
-// Search Product by Name
+// Search by Name
 export const searchProductsByName = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -190,11 +203,11 @@ export const searchProductsByName = async (req, res) => {
         if (!name || name.trim() === "") {
             return res.status(400).json({ success: false, message: "Product name is required" });
         }
+
         const products = await Product.find({
             organization_id: info.user.organization_id || info.user._id,
-            // status: 1, // Only active products
-            name: { $regex: name, $options: "i" }, // Case-insensitive search
-        });
+            name: { $regex: name, $options: "i" },
+        }).populate("category");
 
         res.json({ success: true, products });
     } catch (error) {
@@ -202,7 +215,7 @@ export const searchProductsByName = async (req, res) => {
     }
 };
 
-// Get Product by ID
+// Get by ID
 export const getProductById = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -212,12 +225,11 @@ export const getProductById = async (req, res) => {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
-
         const { id } = req.params;
 
-        const product = await Product.findById(id);
+        const product = await Product.findById(id).populate("category");
 
-        if (!product || product.organization_id.toString() !== (info.user.organization_id||  info.user._id).toString()) {
+        if (!product || product.organization_id.toString() !== (info.user.organization_id || info.user._id).toString()) {
             return res.status(403).json({ success: false, message: "Product not found" });
         }
 
@@ -227,7 +239,7 @@ export const getProductById = async (req, res) => {
     }
 };
 
-// Get Deleted Products with Pagination
+// Deleted Products with Pagination
 export const getDeletedProducts = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -247,7 +259,8 @@ export const getDeletedProducts = async (req, res) => {
         })
             .sort({ createdAt: -1 })
             .skip(skip)
-            .limit(limit);
+            .limit(limit)
+            .populate("category");
 
         const totalCount = await Product.countDocuments({
             organization_id: info.user.organization_id || info.user._id,
@@ -266,6 +279,7 @@ export const getDeletedProducts = async (req, res) => {
     }
 };
 
+// All Products with Optional Filters
 export const getProducts = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -277,10 +291,9 @@ export const getProducts = async (req, res) => {
 
         const organizationId = info.user.organization_id || info.user._id;
 
-        // Get by ID if provided
         const productId = req.query.id;
         if (productId) {
-            const product = await Product.findOne({ _id: productId, organization_id: organizationId });
+            const product = await Product.findOne({ _id: productId, organization_id: organizationId }).populate("category");
             if (!product) {
                 return res.status(404).json({ success: false, message: "Product not found" });
             }
@@ -302,8 +315,9 @@ export const getProducts = async (req, res) => {
             Product.find(query)
                 .sort({ createdAt: -1 })
                 .skip(skip)
-                .limit(limit),
-            Product.countDocuments(query)
+                .limit(limit)
+                .populate("category"),
+            Product.countDocuments(query),
         ]);
 
         const totalPages = Math.ceil(totalCount / limit);
@@ -318,7 +332,7 @@ export const getProducts = async (req, res) => {
                 totalPages,
                 hasNextPage: page < totalPages,
                 hasPreviousPage: page > 1,
-            }
+            },
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
