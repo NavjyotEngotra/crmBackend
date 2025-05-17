@@ -1,6 +1,11 @@
-
 import express from "express";
-import { createMeeting, updateMeeting, getMeetings, deleteMeeting } from "../controllers/meetingController.js";
+import {
+  createMeeting,
+  updateMeeting,
+  getMeetings,
+  deleteMeeting,
+  getMeetingById,
+} from "../controllers/meetingController.js";
 import { verifyOrgOrTeamMember } from "../middlewares/combinedAuthMiddleware.js";
 
 const router = express.Router();
