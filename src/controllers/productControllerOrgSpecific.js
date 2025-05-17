@@ -21,7 +21,6 @@ export const createProduct = async (req, res) => {
             description,
             owner_id,
             tax,
-            amount,
             stockQuantity,
             commissionRate,
             tentativeDate,
@@ -31,13 +30,6 @@ export const createProduct = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "Tax percentage must be between 0 and 100",
-            });
-        }
-
-        if (amount && amount < 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Amount must be greater than 0",
             });
         }
 
@@ -84,7 +76,6 @@ export const createProduct = async (req, res) => {
             price,
             description,
             tax,
-            amount,
             stockQuantity,
             commissionRate,
             tentativeDate,
