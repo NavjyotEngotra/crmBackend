@@ -20,6 +20,7 @@ import categortRoute from "./routes/categoryRoute.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import userDetailsRoutes from "./routes/userDetailsRoutes.js";
+import meetingRoutes from "./routes/meetingRoutes.js";
 
 dotenv.config({
     path:"./env"
@@ -75,6 +76,7 @@ app.use("/api/product", productRoute);
 app.use("/api/note", noteRoute);
 app.use("/api/category", categortRoute);
 app.use("/api/user-details", userDetailsRoutes);
+app.use("/api/meeting", meetingRoutes);
 
 
 // app.get("/razorpay", (req, res) => {
