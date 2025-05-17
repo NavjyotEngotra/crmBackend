@@ -1,4 +1,5 @@
 import Product from "../models/ProductModel.js";
+import { getUserInfo } from "../utilities/getUserInfo.js";
 import TeamMember from "../models/TeamMemberModel.js";
 import Category from "../models/CategoryModel.js";
 import jwt from "jsonwebtoken";
