@@ -56,7 +56,7 @@ export const createProduct = async (req, res) => {
         }
 
         const existingProduct = await Product.findOne({
-            organization_id: info.user._id,
+            organization_id: organizationId,
             $or: [{ name }, { code }],
         });
 
@@ -82,10 +82,14 @@ export const createProduct = async (req, res) => {
             code,
             category,
             price,
-            tentativeDate,
             description,
+            tax,
+            amount,
+            stockQuantity,
+            commissionRate,
+            tentativeDate,
             owner_id: req.user.role === "team_member" ? req.user.id : owner_id,
-            createdBy: req.user.id,
+            createdBy: req.user.id
         });
 
         await newProduct.save();
