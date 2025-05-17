@@ -8,12 +8,7 @@ import mongoose from "mongoose";
 // Create Product (only Organization)
 export const createProduct = async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(" ")[1];
-        const info = await getUserInfo(token);
-
-        if (!info || info.type !== "organization") {
-            return res.status(401).json({ success: false, message: "Only organizations can create products" });
-        }
+        const organizationId = req.user.role === "organization" ? req.user.id : req.user.organizationId;
 
         const { 
             name, 
@@ -76,13 +71,14 @@ export const createProduct = async (req, res) => {
         }
 
         const newProduct = new Product({
-            organization_id: info.user._id,
+            organization_id: organizationId,
             name,
             code,
             category,
             price,
             description,
-            owner_id,
+            owner_id: req.user.role === "team_member" ? req.user.id : owner_id,
+            createdBy: req.user.id
         });
 
         await newProduct.save();

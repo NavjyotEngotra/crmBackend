@@ -1,4 +1,3 @@
-
 import express from "express";
 import {
     createProduct,
@@ -11,6 +10,7 @@ import {
     searchProductsByCategory,
     getOwnedProducts
 } from "../controllers/productControllerOrgSpecific.js";
+import { verifyOrgOrTeamMember } from "../middlewares/combinedAuthMiddleware.js";
 
 const router = express.Router();
 
@@ -63,7 +63,7 @@ const router = express.Router();
  *       401:
  *         description: Unauthorized
  */
-router.post("/", createProduct);
+router.post("/", verifyOrgOrTeamMember, createProduct);
 
 /**
  * @swagger
@@ -82,7 +82,7 @@ router.post("/", createProduct);
 router.get("/", getProducts);
 
 router.put("/update-status/:id" ,updateStatus);
-router.put("/:id", updateProduct);
+router.put("/:id", verifyOrgOrTeamMember, updateProduct);
 router.get("/getOwnedProducts", getOwnedProducts);
 router.get("/deleted", getDeletedProducts);
 router.get("/search", searchProductsByName);
