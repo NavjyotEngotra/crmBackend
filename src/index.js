@@ -3,6 +3,8 @@ import dotenv from "dotenv"
 import express from "express"
 import cookieParser from "cookie-parser";
 import cors from "cors"
+import swaggerUi from 'swagger-ui-express';
+import { specs } from './config/swagger.js';
 import { Server } from "socket.io";
 import { createServer } from 'node:http';
 import planRoutes from "./routes/planRoutes.js";
@@ -34,6 +36,9 @@ app.use(express.json())
 app.use(express.urlencoded())
 app.use(express.static("public"))
 app.use(cookieParser())
+
+// Swagger UI route
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
 app.set("views", path.join(__dirname, "view"));
 app.set("view engine", "ejs");
