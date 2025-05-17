@@ -1,5 +1,5 @@
 import express from "express";
-import { createOrganization, commonLogin, getOrganization, getOrganizations, deleteOrganization, loginOrganization, editOrganization, searchOrganizations, forgotPassword, resetPassword, sendOrganizationOTP, verifyOrganizationOTP, superadminloginOrganization, superadminCommonLogin } from "../controllers/organizationController.js";
+import { createOrganization, commonLogin, getOrganization, getOrganizations, deleteOrganization, loginOrganization, editOrganization, searchOrganizations, forgotPassword, resetPassword, sendOrganizationOTP, verifyOrganizationOTP, superadminloginOrganization, superadminCommonLogin, getSubscriptionPlan } from "../controllers/organizationController.js";
 import { verifyOrganization, verifySuperAdmin } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
@@ -19,5 +19,6 @@ router.post("/reset-password", resetPassword);
 router.get("/getOrganization",getOrganization );
 router.get("/superadminloginOrganization/:id",verifySuperAdmin,superadminloginOrganization );
 router.get("/superadminCommonLogin/:id",verifySuperAdmin,superadminCommonLogin );
+router.get("/subscription-plan", getSubscriptionPlan);
 
 export default router;

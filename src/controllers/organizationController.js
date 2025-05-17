@@ -397,6 +397,44 @@ export const superadminloginOrganization = async (req, res) => {
     }
 };
 
+export const getSubscriptionPlan = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const info = await getUserInfo(token);
+
+        if (!info || info.type !== "organization") {
+            return res.status(401).json({ 
+                success: false, 
+                message: "Unauthorized - Organization access required" 
+            });
+        }
+
+        const organization = await Organization.findById(info.user._id)
+            .populate('plan_id')
+            .select('plan_id plan_expire_date');
+
+        if (!organization) {
+            return res.status(404).json({
+                success: false,
+                message: "Organization not found"
+            });
+        }
+
+        const subscriptionData = {
+            plan: organization.plan_id,
+            expireDate: organization.plan_expire_date,
+            isActive: organization.plan_expire_date ? new Date(organization.plan_expire_date) > new Date() : false
+        };
+
+        res.json({
+            success: true,
+            subscription: subscriptionData
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 export const commonLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
