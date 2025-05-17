@@ -3,6 +3,7 @@ import TeamMember from "../models/TeamMemberModel.js";
 import Category from "../models/CategoryModel.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import { getUserInfo } from "../utilities/getUserInfo.js";
 
 // Create Product (only Organization)
 export const createProduct = async (req, res) => {
@@ -186,13 +187,11 @@ export const updateStatus = async (req, res) => {
 
         const { id } = req.params;
         const { status } = req.body;
-
+        
+        const organizationId = info.type === "organization" ? info.user._id : info.organization_id;
         const product = await Product.findById(id);
 
-        if (
-            !product ||
-            product.organization_id.toString() !== info.user._id.toString()
-        ) {
+        if (!product || product.organization_id.toString() !== organizationId.toString()) {
             return res
                 .status(404)
                 .json({ success: false, message: "Product not found" });
