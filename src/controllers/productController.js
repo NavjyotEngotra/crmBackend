@@ -7,10 +7,17 @@ export const createProduct = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const teamMember = await TeamMember.findById(decoded.id);
-
-        if (!teamMember || teamMember.status !== 1) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
+        
+        let organizationId;
+        
+        if (decoded.role === 'organization') {
+            organizationId = decoded.id;
+        } else {
+            const teamMember = await TeamMember.findById(decoded.id);
+            if (!teamMember || teamMember.status !== 1) {
+                return res.status(401).json({ success: false, message: "Unauthorized" });
+            }
+            organizationId = teamMember.organization_id;
         }
 
         const { name, code, category, price, description, owner_id } = req.body;
@@ -31,15 +38,15 @@ export const createProduct = async (req, res) => {
         }
 
         const newProduct = new Product({
-            organization_id: teamMember.organization_id,
+            organization_id: organizationId,
             name,
             code,
             category,
             price,
             description,
             owner_id,
-            createdBy: teamMember._id,
-            updatedBy: teamMember._id,
+            createdBy: decoded.role === 'organization' ? decoded.id : decoded.id,
+            updatedBy: decoded.role === 'organization' ? decoded.id : decoded.id,
         });
 
         await newProduct.save();
