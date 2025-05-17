@@ -8,6 +8,7 @@ const router = express.Router();
 router.post("/", verifyOrgOrTeamMember, createMeeting);
 router.put("/:id", verifyOrgOrTeamMember, updateMeeting);
 router.get("/", verifyOrgOrTeamMember, getMeetings);
+router.get("/:id", verifyOrgOrTeamMember, getMeetingById);
 router.delete("/:id", verifyOrgOrTeamMember, deleteMeeting);
 
 export default router;

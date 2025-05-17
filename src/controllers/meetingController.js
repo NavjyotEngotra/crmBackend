@@ -69,6 +69,27 @@ export const updateMeeting = async (req, res) => {
     }
 };
 
+export const getMeetingById = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const info = await getUserInfo(token);
+        const { id } = req.params;
+
+        const meeting = await Meeting.findOne({
+            _id: id,
+            organization_id: info.user.organization_id || info.user._id
+        });
+
+        if (!meeting) {
+            return res.status(404).json({ success: false, message: "Meeting not found" });
+        }
+
+        res.json({ success: true, meeting });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 export const getMeetings = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -79,9 +100,12 @@ export const getMeetings = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const query = {
-            organization_id: info.user.organization_id || info.user._id,
-            status: 1
+            organization_id: info.user.organization_id || info.user._id
         };
+
+        if (req.query.status !== undefined) {
+            query.status = parseInt(req.query.status);
+        }
 
         const [meetings, total] = await Promise.all([
             Meeting.find(query)
