@@ -99,9 +99,9 @@ export const updateProduct = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        
+
         let organizationId;
-        
+
         if (decoded.role === 'organization') {
             organizationId = decoded.id;
         } else {
@@ -117,10 +117,7 @@ export const updateProduct = async (req, res) => {
 
         const product = await Product.findById(id);
 
-        if (
-            !product ||
-            product.organization_id.toString() !== info.user._id.toString()
-        ) {
+        if (!product || product.organization_id.toString() !== organizationId.toString()) {
             return res
                 .status(404)
                 .json({ success: false, message: "Product not found" });
@@ -129,7 +126,7 @@ export const updateProduct = async (req, res) => {
         if (updateData.name || updateData.code) {
             const duplicateProduct = await Product.findOne({
                 _id: { $ne: id },
-                organization_id: info.user._id,
+                organization_id: organizationId,
                 $or: [
                     updateData.name ? { name: updateData.name } : {},
                     updateData.code ? { code: updateData.code } : {},
