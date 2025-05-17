@@ -1,3 +1,4 @@
+
 import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema(
@@ -29,13 +30,35 @@ const productSchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
+        tax: {
+            type: Number,
+            required: true,
+            default: 0,
+        },
+        amount: {
+            type: Number,
+            required: true,
+        },
+        stockQuantity: {
+            type: Number,
+            required: true,
+            default: 0,
+        },
+        commissionRate: {
+            type: Number,
+            required: true,
+            default: 0,
+        },
+        tentativeDate: {
+            type: Date,
+        },
         owner_id: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "TeamMember",
         },
         status: {
             type: Number,
-            enum: [0, 1], // 0 = deleted, 1 = active
+            enum: [0, 1],
             default: 1,
         },
     },

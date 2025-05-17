@@ -40,10 +40,23 @@ const router = express.Router();
  *                 type: string
  *               category:
  *                 type: string
+ *                 description: Category ID (foreign key)
  *               price:
  *                 type: number
  *               description:
  *                 type: string
+ *               tax:
+ *                 type: number
+ *                 description: Tax percentage
+ *               amount:
+ *                 type: number
+ *               stockQuantity:
+ *                 type: number
+ *               commissionRate:
+ *                 type: number
+ *               tentativeDate:
+ *                 type: string
+ *                 format: date
  *     responses:
  *       201:
  *         description: Product created successfully

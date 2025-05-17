@@ -15,7 +15,47 @@ export const createProduct = async (req, res) => {
             return res.status(401).json({ success: false, message: "Only organizations can create products" });
         }
 
-        const { name, code, category, price, description, owner_id } = req.body;
+        const { 
+            name, 
+            code, 
+            category, 
+            price, 
+            description, 
+            owner_id,
+            tax,
+            amount,
+            stockQuantity,
+            commissionRate,
+            tentativeDate 
+        } = req.body;
+
+        if (tax && (tax < 0 || tax > 100)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Tax percentage must be between 0 and 100" 
+            });
+        }
+
+        if (amount && amount < 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Amount must be greater than 0" 
+            });
+        }
+
+        if (stockQuantity && stockQuantity < 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Stock quantity must be greater than 0" 
+            });
+        }
+
+        if (commissionRate && (commissionRate < 0 || commissionRate > 100)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Commission rate must be between 0 and 100" 
+            });
+        }
 
         const existingProduct = await Product.findOne({
             organization_id: info.user._id,
