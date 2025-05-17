@@ -1,8 +1,7 @@
 import Product from "../models/ProductModel.js";
 import TeamMember from "../models/TeamMemberModel.js";
-import Category from "../models/CategoryModel.js"; // ✅ Import Category model
+import Category from "../models/CategoryModel.js";
 import jwt from "jsonwebtoken";
-import { getUserInfo } from "../utilities/getUserInfo.js";
 import mongoose from "mongoose";
 
 // Create Product (only Organization)
@@ -99,27 +98,19 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const info = await getUserInfo(token);
-
-        if (!info) {
-            return res
-                .status(401)
-                .json({
-                    success: false,
-                    message: "Unauthorized access",
-                });
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        let organizationId;
+        
+        if (decoded.role === 'organization') {
+            organizationId = decoded.id;
+        } else {
+            const teamMember = await TeamMember.findById(decoded.id);
+            if (!teamMember || teamMember.status !== 1) {
+                return res.status(401).json({ success: false, message: "Unauthorized" });
+            }
+            organizationId = teamMember.organization_id;
         }
-
-        if (info.type !== "organization" && info.type !== "team_member") {
-            return res
-                .status(401)
-                .json({
-                    success: false,
-                    message: "Only organizations and team members can update products",
-                });
-        }
-
-        const organizationId = info.type === "organization" ? info.user._id : info.organization_id;
 
         const { id } = req.params;
         const updateData = { ...req.body };
