@@ -101,7 +101,16 @@ export const updateProduct = async (req, res) => {
         const token = req.headers.authorization?.split(" ")[1];
         const info = await getUserInfo(token);
 
-        if (!info || (info.type !== "organization" && info.type !== "team_member")) {
+        if (!info) {
+            return res
+                .status(401)
+                .json({
+                    success: false,
+                    message: "Unauthorized access",
+                });
+        }
+
+        if (info.type !== "organization" && info.type !== "team_member") {
             return res
                 .status(401)
                 .json({
@@ -109,6 +118,8 @@ export const updateProduct = async (req, res) => {
                     message: "Only organizations and team members can update products",
                 });
         }
+
+        const organizationId = info.type === "organization" ? info.user._id : info.organization_id;
 
         const { id } = req.params;
         const updateData = { ...req.body };
