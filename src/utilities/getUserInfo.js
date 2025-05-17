@@ -12,6 +12,18 @@ export const getUserInfo = async (token) => {
         return { type: "organization", user: organization };
     }
 
+    if (decoded.role === "team_member") {
+        const teamMember = await TeamMember.findById(decoded.id);
+        if (!teamMember) return null;
+        return { 
+            type: "team_member", 
+            user: {
+                ...teamMember.toObject(),
+                _id: teamMember.organization_id // Set organization id for product verification
+            }
+        };
+    }
+
     const teamMember = await TeamMember.findById(decoded.id);
     if (teamMember && teamMember.status === 1) {
         return { type: "teamMember", user: teamMember };
