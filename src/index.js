@@ -21,6 +21,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 import userDetailsRoutes from "./routes/userDetailsRoutes.js";
 import meetingRoutes from "./routes/meetingRoutes.js";
+import pipelineRoutes from "./routes/pipelineRoutes.js";
+import stageRoutes from "./routes/stageRoutes.js";
+
+// Import models to ensure they are registered
+import "./models/index.js";
 
 dotenv.config({
     path:"./env"
@@ -77,6 +82,9 @@ app.use("/api/note", noteRoute);
 app.use("/api/category", categortRoute);
 app.use("/api/user-details", userDetailsRoutes);
 app.use("/api/meeting", meetingRoutes);
+app.use("/api/pipeline", pipelineRoutes);
+app.use("/api/stage", stageRoutes);
+
 
 
 // app.get("/razorpay", (req, res) => {

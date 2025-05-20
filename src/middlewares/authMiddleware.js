@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { asyncHandler } from "../utilities/asyncHandler.js";
 import TeamMember from "../models/TeamMemberModel.js";
+import Organization from "../models/OrganizationModel.js";
 
 export const protect = asyncHandler(async (req, res, next) => {
     let token = req.headers.authorization;
@@ -76,5 +77,62 @@ export const isAdmin = async (req, res, next) => {
         next();
     } catch (error) {
         res.status(401).json({ success: false, message: "Invalid token or unauthorized" });
+    }
+};
+
+export const verifyToken = async (req, res, next) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+
+        if (!token) {
+            return res.status(401).json({ 
+                success: false,
+                message: "Unauthorized, token required" 
+            });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        if (!decoded) {
+            return res.status(401).json({ 
+                success: false,
+                message: "Invalid token" 
+            });
+        }
+
+        // Check if user is organization or team member
+        let user;
+        if (decoded.role === "organization") {
+            user = await Organization.findById(decoded.id);
+            if (!user) {
+                return res.status(401).json({ 
+                    success: false,
+                    message: "Organization not found" 
+                });
+            }
+            req.user = {
+                type: "organization",
+                user: user
+            };
+        } else {
+            user = await TeamMember.findById(decoded.id);
+            if (!user) {
+                return res.status(401).json({ 
+                    success: false,
+                    message: "Team member not found" 
+                });
+            }
+            req.user = {
+                type: "teamMember",
+                user: user
+            };
+        }
+
+        next();
+    } catch (error) {
+        return res.status(401).json({ 
+            success: false,
+            message: "Invalid token" 
+        });
     }
 };
