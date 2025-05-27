@@ -1,5 +1,5 @@
 import express from "express";
-import { createStage, getStages, getStageById, updateStage } from "../controllers/stageController.js";
+import { createStage, createStages, getStages, getStageById, updateStage, updateStages } from "../controllers/stageController.js";
 import { verifyToken } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
@@ -8,9 +8,11 @@ const router = express.Router();
 router.use(verifyToken);
 
 // CRUD routes
-router.post("/", createStage);
+// router.post("/", createStage);
+router.post("/", createStages);
 router.get("/", getStages);
 router.get("/:id", getStageById);
-router.put("/:id", updateStage);
+// router.put("/:id", updateStage);
+router.put("/", updateStages);
 
 export default router; 
