@@ -2,6 +2,7 @@ import Stage from "../models/StageModel.js";
 import Pipeline from "../models/PipelineModel.js";
 import TeamMember from "../models/TeamMemberModel.js";
 import jwt from "jsonwebtoken";
+import Organization from "../models/OrganizationModel.js";
 
 // Create Stage
 export const createStage = async (req, res) => {
@@ -616,6 +617,76 @@ export const updateStages = async (req, res) => {
     }
 }; 
 
+// export const swapSerialNumbers = async (req, res) => {
+//   try {
+//     const { pipeline_id, swaps } = req.body;
+//     const token = req.headers.authorization?.split(" ")[1];
+
+//     if (!pipeline_id || !Array.isArray(swaps) || swaps.length === 0) {
+//       return res.status(400).json({ message: "pipeline_id and non-empty swaps array are required." });
+//     }
+
+//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+//     const teamMember = await TeamMember.findById(decoded.id);
+//     if (!teamMember) return res.status(401).json({ message: "Unauthorized: team member not found" });
+
+//     const pipeline = await Pipeline.findOne({
+//       _id: pipeline_id,
+//       organization_id: teamMember.organization_id,
+//     });
+//     if (!pipeline) return res.status(403).json({ message: "Pipeline not found or access denied" });
+
+//     const stageIds = swaps.map((s) => s.stage_id);
+//     const stages = await Stage.find({
+//       _id: { $in: stageIds },
+//       pipeline_id,
+//       organization_id: teamMember.organization_id,
+//     });
+
+//     if (stages.length !== swaps.length) {
+//       return res.status(404).json({ message: "Some stages not found or unauthorized" });
+//     }
+
+//     const newSerials = swaps.map((s) => s.serial_number ?? s.serialNumber);
+//     const hasDuplicates = new Set(newSerials).size !== newSerials.length;
+//     if (hasDuplicates) {
+//       return res.status(400).json({ message: "Duplicate serial_number values in swaps array" });
+//     }
+
+//     if (!newSerials.every((n) => Number.isInteger(n) && n > 0)) {
+//       return res.status(400).json({ message: "All serial_number values must be positive integers" });
+//     }
+
+//     // Step 1: Temporarily move all affected stages' serial numbers to large unique numbers (e.g., +1000)
+//     const tempBulkOps = swaps.map(({ stage_id }) => ({
+//       updateOne: {
+//         filter: { _id: stage_id },
+//         update: { $inc: { serialNumber: 1000 } }, // adding 1000 to avoid conflicts
+//       },
+//     }));
+
+//     await Stage.bulkWrite(tempBulkOps);
+
+//     // Step 2: Update to target serial numbers
+//     const finalBulkOps = swaps.map(({ stage_id, serial_number, serialNumber }) => ({
+//       updateOne: {
+//         filter: { _id: stage_id },
+//         update: { serialNumber: serial_number ?? serialNumber },
+//       },
+//     }));
+
+//     await Stage.bulkWrite(finalBulkOps);
+
+//     return res.status(200).json({ message: "Serial numbers updated successfully" });
+//   } catch (err) {
+//     console.error("Swap serial error:", err);
+//     return res.status(500).json({
+//       message: "Failed to update stages due to duplicate serial numbers or other constraint",
+//       error: err.message,
+//     });
+//   }
+// };
+
 export const swapSerialNumbers = async (req, res) => {
   try {
     const { pipeline_id, swaps } = req.body;
@@ -625,13 +696,29 @@ export const swapSerialNumbers = async (req, res) => {
       return res.status(400).json({ message: "pipeline_id and non-empty swaps array are required." });
     }
 
+    // Decode token to find user type (team member or organization)
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const teamMember = await TeamMember.findById(decoded.id);
-    if (!teamMember) return res.status(401).json({ message: "Unauthorized: team member not found" });
 
+    let organization_id;
+
+    // Try finding team member first
+    const teamMember = await TeamMember.findById(decoded.id);
+    if (teamMember) {
+      organization_id = teamMember.organization_id;
+    } else {
+      // Try finding organization by decoded id
+      const organization = await Organization.findById(decoded.id);
+      if (organization) {
+        organization_id = organization._id;
+      } else {
+        return res.status(401).json({ message: "Unauthorized: user not found" });
+      }
+    }
+
+    // Check pipeline belongs to the organization
     const pipeline = await Pipeline.findOne({
       _id: pipeline_id,
-      organization_id: teamMember.organization_id,
+      organization_id,
     });
     if (!pipeline) return res.status(403).json({ message: "Pipeline not found or access denied" });
 
@@ -639,7 +726,7 @@ export const swapSerialNumbers = async (req, res) => {
     const stages = await Stage.find({
       _id: { $in: stageIds },
       pipeline_id,
-      organization_id: teamMember.organization_id,
+      organization_id,
     });
 
     if (stages.length !== swaps.length) {
@@ -660,7 +747,7 @@ export const swapSerialNumbers = async (req, res) => {
     const tempBulkOps = swaps.map(({ stage_id }) => ({
       updateOne: {
         filter: { _id: stage_id },
-        update: { $inc: { serialNumber: 1000 } }, // adding 1000 to avoid conflicts
+        update: { $inc: { serialNumber: 1000 } },
       },
     }));
 
