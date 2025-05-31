@@ -1,4 +1,5 @@
 import Pipeline from "../models/PipelineModel.js";
+import Stage from "../models/StageModel.js"; 
 
 // Create Pipeline
 export const createPipeline = async (req, res) => {
@@ -186,43 +187,52 @@ export const updatePipeline = async (req, res) => {
 };
 
 // Get Pipeline by ID
+
 export const getPipelineById = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { type, user } = req.user;
+  try {
+    const { id } = req.params;
+    const { type, user } = req.user;
 
-        let query = { _id: id };
+    let query = { _id: id };
 
-        // Set organization_id based on user type
-        if (type === "organization") {
-            // Organization can see any pipeline in their organization
-            query.organization_id = user._id;
-        } else if (type === "teamMember") {
-            // Team member can only see pipelines where they are in users_has_access
-            query.organization_id = user.organization_id;
-            query.users_has_access = user._id;
-        }
-
-        const pipeline = await Pipeline.findOne(query)
-            .populate('created_by', 'name email')
-            .populate('updated_by', 'name email')
-            .populate('users_has_access', 'name email');
-
-        if (!pipeline) {
-            return res.status(404).json({
-                success: false,
-                message: "Pipeline not found or access denied"
-            });
-        }
-
-        res.json({
-            success: true,
-            pipeline
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+    // Set organization_id based on user type
+    if (type === "organization") {
+      // Organization can see any pipeline in their organization
+      query.organization_id = user._id;
+    } else if (type === "teamMember") {
+      // Team member can only see pipelines where they are in users_has_access
+      query.organization_id = user.organization_id;
+      query.users_has_access = user._id;
     }
-}; 
+
+    const pipeline = await Pipeline.findOne(query)
+      .populate('created_by', 'name email')
+      .populate('updated_by', 'name email')
+      .populate('users_has_access', 'name email');
+
+    if (!pipeline) {
+      return res.status(404).json({
+        success: false,
+        message: "Pipeline not found or access denied",
+      });
+    }
+
+    // Find stages that belong to this pipeline and organization
+    const stages = await Stage.find({
+      pipeline_id: pipeline._id,
+      organization_id: pipeline.organization_id,
+      status: 1, // optional: fetch only active stages
+    }).sort({ serialNumber: 1 }); // optional: sort stages by serialNumber
+
+    res.json({
+      success: true,
+      pipeline,
+      stages,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
