@@ -2,6 +2,8 @@ import Company from "../models/CompanyModel.js";
 import TeamMember from "../models/TeamMemberModel.js";
 import jwt from "jsonwebtoken";
 import { getUserInfo } from "../utilities/getUserInfo.js";
+import Contact from "../models/ContactModel.js"; // import your Contact model
+
 
 // Create Company
 export const createCompany = async (req, res) => {
@@ -62,17 +64,24 @@ export const getCompanies = async (req, res) => {
 
         const organizationId = info.user.organization_id || info.user._id;
 
-        // Get by ID
+        // Get single company by ID and its contacts
         const companyId = req.query.id;
         if (companyId) {
             const company = await Company.findOne({ _id: companyId, organization_id: organizationId });
             if (!company) {
                 return res.status(404).json({ success: false, message: "Company not found" });
             }
-            return res.json({ success: true, company });
+
+            const contacts = await Contact.find({ company_id: companyId, organization_id: organizationId });
+
+            return res.json({
+                success: true,
+                company,
+                contacts
+            });
         }
 
-        // Filters and pagination
+        // List companies with pagination + filters
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(parseInt(req.query.limit) || 50, 100);
         const skip = (page - 1) * limit;
@@ -156,7 +165,16 @@ export const getCompanyById = async (req, res) => {
             return res.status(403).json({ success: false, message: "Company not found" });
         }
 
-        res.json({ success: true, company });
+        const contacts = await Contact.find({
+            company_id: company._id,
+            organization_id: teamMember.organization_id
+        });
+
+        res.json({
+            success: true,
+            company,
+            contacts
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
