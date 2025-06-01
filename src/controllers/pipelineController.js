@@ -1,5 +1,6 @@
 import Pipeline from "../models/PipelineModel.js";
 import Stage from "../models/StageModel.js"; 
+import Lead from '../models/LeadModel.js';
 
 // Create Pipeline
 export const createPipeline = async (req, res) => {
@@ -197,10 +198,8 @@ export const getPipelineById = async (req, res) => {
 
     // Set organization_id based on user type
     if (type === "organization") {
-      // Organization can see any pipeline in their organization
       query.organization_id = user._id;
     } else if (type === "teamMember") {
-      // Team member can only see pipelines where they are in users_has_access
       query.organization_id = user.organization_id;
       query.users_has_access = user._id;
     }
@@ -221,13 +220,37 @@ export const getPipelineById = async (req, res) => {
     const stages = await Stage.find({
       pipeline_id: pipeline._id,
       organization_id: pipeline.organization_id,
-      status: 1, // optional: fetch only active stages
-    }).sort({ serialNumber: 1 }); // optional: sort stages by serialNumber
+      status: 1,
+    }).sort({ serialNumber: 1 });
+
+    // For each stage, get leads sorted by createdAt
+    const stagesWithLeads = await Promise.all(
+      stages.map(async (stage) => {
+        const leads = await Lead.find({
+          pipeline_id: pipeline._id,
+          stage_id: stage._id,
+          organization_id: pipeline.organization_id,
+          status: 1,
+        })
+          .sort({ createdAt: 1 })
+          .populate('assigned_to', 'name email')
+          .populate('created_by', 'name email')
+          .populate('updated_by', 'name email')
+          .populate('product_id', 'name')
+          .populate('company_id', 'name')
+          .populate('contact_id', 'name email');
+
+        return {
+          ...stage.toObject(),
+          leads,
+        };
+      })
+    );
 
     res.json({
       success: true,
       pipeline,
-      stages,
+      stages: stagesWithLeads,
     });
   } catch (error) {
     res.status(500).json({
