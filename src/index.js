@@ -23,6 +23,7 @@ import userDetailsRoutes from "./routes/userDetailsRoutes.js";
 import meetingRoutes from "./routes/meetingRoutes.js";
 import pipelineRoutes from "./routes/pipelineRoutes.js";
 import stageRoutes from "./routes/stageRoutes.js";
+import leadRoutes from "./routes/leadRoutes.js";
 
 // Import models to ensure they are registered
 import "./models/index.js";
@@ -84,6 +85,7 @@ app.use("/api/user-details", userDetailsRoutes);
 app.use("/api/meeting", meetingRoutes);
 app.use("/api/pipeline", pipelineRoutes);
 app.use("/api/stage", stageRoutes);
+app.use("/api/lead", leadRoutes);
 
 
 

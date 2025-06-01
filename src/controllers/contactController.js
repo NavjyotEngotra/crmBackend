@@ -14,20 +14,20 @@ export const createContact = async (req, res) => {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
-        const { name, phoneno, address, pincode, owner_id, email,company_id,title } = req.body;
+        const { name, phoneno, address, pincode, owner_id, email, company_id, title } = req.body;
 
 
-            const existingCompany = await Contact.findOne({
-                    organization_id: info.user.organization_id || info.user._id,
-                    email: email, // case-insensitive match
-                });
-        
-                if (existingCompany) {
-                    return res.status(409).json({
-                        success: false,
-                        message: "Contact with the same email already exists"
-                    });
-                }
+        const existing = await Contact.findOne({
+            organization_id: info.user.organization_id || info.user._id,
+            email: email, // case-insensitive match
+        });
+
+        if (existing) {
+            return res.status(409).json({
+                success: false,
+                message: "Contact with the same email already exists"
+            });
+        }
 
         const newContact = new Contact({
             organization_id: info.user.organization_id || info.user._id,
@@ -64,19 +64,24 @@ export const updateContact = async (req, res) => {
         const updateData = { ...req.body };
 
         const contact = await Contact.findById(id);
-        if (!contact || contact.organization_id.toString() !== (info.user.organization_id||info.user._id).toString())
+        if (!contact || contact.organization_id.toString() !== (info.user.organization_id || info.user._id).toString())
             return res.status(404).json({ success: false, message: "Contact not found" });
 
-        const existingCompany = await Contact.findOne({
-            organization_id: info.user.organization_id||info.user._id,
-            email: updateData.email, // case-insensitive match
-        });
+        const isSameEmail =
+            contact.email?.toLowerCase() === updateData.email?.toLowerCase();
 
-        if (existingCompany) {
-            return res.status(409).json({
-                success: false,
-                message: "Contact with the same email already exists"
+        if (!isSameEmail) {
+            const existing = await Contact.findOne({
+                organization_id: info.user.organization_id || info.user._id,
+                email: updateData.email, // case-insensitive match
             });
+
+            if (existing) {
+                return res.status(409).json({
+                    success: false,
+                    message: "Contact with the same email already exists"
+                });
+            }
         }
 
         //  Prevent organization_id from being updated
@@ -152,28 +157,28 @@ export const getContacts = async (req, res) => {
 export const getDeletedContacts = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-         const info = await getUserInfo(token);
- 
-         if (!info || info.user.status !== 1) {
-             return res.status(401).json({ success: false, message: "Unauthorized" });
-         }
+        const info = await getUserInfo(token);
+
+        if (!info || info.user.status !== 1) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
 
 
-      const page = parseInt(req.query.page) || 1;
-      const limit = 50;
-      const skip = (page - 1) * limit;
+        const page = parseInt(req.query.page) || 1;
+        const limit = 50;
+        const skip = (page - 1) * limit;
 
-      const contacts = await Contact.find({
-          organization_id: info.user.organization_id||info.user.id,
-          status: 0
-      })
-      .skip(skip)
-      .limit(limit);
+        const contacts = await Contact.find({
+            organization_id: info.user.organization_id || info.user.id,
+            status: 0
+        })
+            .skip(skip)
+            .limit(limit);
 
-      res.json({ success: true, contacts });
-  } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
-  }
+        res.json({ success: true, contacts });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
 };
 
 // Soft delete contact
@@ -198,7 +203,7 @@ export const updateStatus = async (req, res) => {
         contact.updatedBy = teamMember._id;
 
         await contact.save();
-        res.json({ success: true, message: "status updated",contact });
+        res.json({ success: true, message: "status updated", contact });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
