@@ -5,48 +5,13 @@ import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import { getUserInfo } from "../utilities/getUserInfo.js";
 
-// Helper function for populating product fields
-const populateProductFields = (query) => {
-    return query
-        .populate('organization_id')
-        .populate('category')
-        .populate('owner_id', '-password')
-        .populate({
-            path: 'created_by',
-            model: 'Organization',
-            select: '-password'
-        })
-        .populate({
-            path: 'created_by',
-            model: 'TeamMember',
-            select: '-password'
-        })
-        .populate({
-            path: 'updated_by',
-            model: 'Organization',
-            select: '-password'
-        })
-        .populate({
-            path: 'updated_by',
-            model: 'TeamMember',
-            select: '-password'
-        });
-};
-
 // Create Product (only Organization)
 export const createProduct = async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(" ")[1];
-        const info = await getUserInfo(token);
-
-        if (!info || info.user.status !== 1) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized"
-            });
-        }
-
-        const organizationId = info.user.organization_id || info.user._id;
+        const organizationId =
+            req.user.role === "organization"
+                ? req.user.id
+                : req.user.organizationId;
 
         const {
             name,
@@ -103,7 +68,7 @@ export const createProduct = async (req, res) => {
                 .json({ success: false, message: "Invalid category ID" });
         }
 
-        const product = new Product({
+        const newProduct = new Product({
             organization_id: organizationId,
             name,
             code,
@@ -115,27 +80,18 @@ export const createProduct = async (req, res) => {
             commissionRate,
             tentativeDate,
             owner_id: req.user.role === "team_member" ? req.user.id : owner_id,
-            created_by: info.user._id,
-            created_by_model: info.role === 'organization' ? 'Organization' : 'TeamMember',
-            updated_by: info.user._id,
-            updated_by_model: info.role === 'organization' ? 'Organization' : 'TeamMember'
+            createdBy: req.user.id
         });
 
-        await product.save();
-
-        // Fetch the product with populated fields
-        const populatedProduct = await populateProductFields(Product.findById(product._id));
+        await newProduct.save();
 
         res.status(201).json({
             success: true,
             message: "Product created successfully",
-            product: populatedProduct
+            product: newProduct,
         });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -143,52 +99,74 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const info = await getUserInfo(token);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        if (!info || info.user.status !== 1) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized"
-            });
+        let organizationId;
+
+        if (decoded.role === 'organization') {
+            organizationId = decoded.id;
+        } else {
+            const teamMember = await TeamMember.findById(decoded.id);
+            if (!teamMember || teamMember.status !== 1) {
+                return res.status(401).json({ success: false, message: "Unauthorized" });
+            }
+            organizationId = teamMember.organization_id;
         }
 
-        const organizationId = info.user.organization_id || info.user._id;
+        const { id } = req.params;
+        const updateData = { ...req.body };
 
-        const product = await Product.findOne({
-            _id: req.params.id,
-            organization_id: organizationId
+        const product = await Product.findById(id);
+
+        if (!product || product.organization_id.toString() !== organizationId.toString()) {
+            return res
+                .status(404)
+                .json({ success: false, message: "Product not found" });
+        }
+
+        if (updateData.name || updateData.code) {
+            const duplicateProduct = await Product.findOne({
+                _id: { $ne: id },
+                organization_id: organizationId,
+                $or: [
+                    updateData.name ? { name: updateData.name } : {},
+                    updateData.code ? { code: updateData.code } : {},
+                ],
+            });
+
+            if (duplicateProduct) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "Another product with the same name or code exists in your organization",
+                });
+            }
+        }
+
+        // ✅ Validate updated category if provided
+        if (updateData.category) {
+            const validCategory = await Category.findById(updateData.category);
+            if (!validCategory) {
+                return res
+                    .status(400)
+                    .json({ success: false, message: "Invalid category ID" });
+            }
+        }
+
+        delete updateData.organization_id;
+        delete updateData.status;
+
+        const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
+            new: true,
         });
-
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: "Product not found"
-            });
-        }
-
-        // Update the product
-        const updatedProduct = await populateProductFields(
-            Product.findByIdAndUpdate(
-                req.params.id,
-                {
-                    ...req.body,
-                    updated_by: info.user._id,
-                    updated_by_model: info.role === 'organization' ? 'Organization' : 'TeamMember'
-                },
-                { new: true, runValidators: true }
-            )
-        );
 
         res.json({
             success: true,
-            message: "Product updated successfully",
-            product: updatedProduct
+            message: "Product updated",
+            product: updatedProduct,
         });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -196,47 +174,37 @@ export const updateProduct = async (req, res) => {
 export const updateStatus = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const info = await getUserInfo(token);
-
-        if (!info || info.user.status !== 1) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized"
-            });
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        let organizationId;
+        
+        if (decoded.role === 'organization') {
+            organizationId = decoded.id;
+        } else {
+            const teamMember = await TeamMember.findById(decoded.id);
+            if (!teamMember || teamMember.status !== 1) {
+                return res.status(401).json({ success: false, message: "Unauthorized" });
+            }
+            organizationId = teamMember.organization_id;
         }
 
-        const organizationId = info.user.organization_id || info.user._id;
+        const { id } = req.params;
+        const { status } = req.body;
+        
+        const product = await Product.findById(id);
 
-        const product = await Product.findOne({
-            _id: req.params.id,
-            organization_id: organizationId
-        });
-
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: "Product not found"
-            });
+        if (!product || product.organization_id.toString() !== organizationId.toString()) {
+            return res
+                .status(404)
+                .json({ success: false, message: "Product not found" });
         }
 
-        product.status = req.body.status;
-        product.updated_by = info.user._id;
-        product.updated_by_model = info.role === 'organization' ? 'Organization' : 'TeamMember';
-
+        product.status = status;
         await product.save();
 
-        const populatedProduct = await populateProductFields(Product.findById(product._id));
-
-        res.json({
-            success: true,
-            message: "Product status updated successfully",
-            product: populatedProduct
-        });
+        res.json({ success: true, message: "Product status updated", product });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -244,34 +212,28 @@ export const updateStatus = async (req, res) => {
 export const getOwnedProducts = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        const info = await getUserInfo(token);
+        if (!token)
+            return res
+                .status(401)
+                .json({ success: false, message: "Token missing" });
 
-        if (!info || info.user.status !== 1) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized"
-            });
-        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const teamMember = await TeamMember.findById(decoded.id);
 
-        const organizationId = info.user.organization_id || info.user._id;
+        if (!teamMember || teamMember.status !== 1)
+            return res
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
 
-        const products = await populateProductFields(
-            Product.find({
-                organization_id: organizationId,
-                status: 1,
-                owner_id: info.user._id
-            })
-        );
+        const products = await Product.find({
+            organization_id: teamMember.organization_id,
+            owner_id: teamMember._id,
+            status: 1,
+        }).populate("category"); // ✅ Populate category
 
-        res.json({
-            success: true,
-            products
-        });
+        res.json({ success: true, products });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -282,31 +244,30 @@ export const searchProductsByCategory = async (req, res) => {
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized"
-            });
+            return res
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
         }
 
-        const organizationId = info.user.organization_id || info.user._id;
+        const { category } = req.query;
+        if (!category || !mongoose.Types.ObjectId.isValid(category)) {
+            return res
+                .status(400)
+                .json({
+                    success: false,
+                    message: "Valid category ID is required",
+                });
+        }
 
-        const products = await populateProductFields(
-            Product.find({
-                organization_id: organizationId,
-                status: 1,
-                category: req.params.id
-            })
-        );
+        const products = await Product.find({
+            organization_id: info.user.organization_id || info.user._id,
+            status: 1,
+            category,
+        }).populate("category");
 
-        res.json({
-            success: true,
-            products
-        });
+        res.json({ success: true, products });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -317,31 +278,27 @@ export const searchProductsByName = async (req, res) => {
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized"
-            });
+            return res
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
         }
 
-        const organizationId = info.user.organization_id || info.user._id;
+        const { name } = req.query;
 
-        const products = await populateProductFields(
-            Product.find({
-                organization_id: organizationId,
-                status: 1,
-                name: { $regex: req.query.name, $options: "i" }
-            })
-        );
+        if (!name || name.trim() === "") {
+            return res
+                .status(400)
+                .json({ success: false, message: "Product name is required" });
+        }
 
-        res.json({
-            success: true,
-            products
-        });
+        const products = await Product.find({
+            organization_id: info.user.organization_id || info.user._id,
+            name: { $regex: name, $options: "i" },
+        }).populate("category");
+
+        res.json({ success: true, products });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -352,37 +309,28 @@ export const getProductById = async (req, res) => {
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized"
-            });
+            return res
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
         }
 
-        const organizationId = info.user.organization_id || info.user._id;
+        const { id } = req.params;
 
-        const product = await populateProductFields(
-            Product.findOne({
-                _id: req.params.id,
-                organization_id: organizationId
-            })
-        );
+        const product = await Product.findById(id).populate("category");
 
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: "Product not found"
-            });
+        if (
+            !product ||
+            product.organization_id.toString() !==
+                (info.user.organization_id || info.user._id).toString()
+        ) {
+            return res
+                .status(403)
+                .json({ success: false, message: "Product not found" });
         }
 
-        res.json({
-            success: true,
-            product
-        });
+        res.json({ success: true, product });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -393,84 +341,89 @@ export const getDeletedProducts = async (req, res) => {
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized"
-            });
+            return res
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
         }
 
-        const organizationId = info.user.organization_id || info.user._id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = 50;
+        const skip = (page - 1) * limit;
 
-        const products = await populateProductFields(
-            Product.find({
-                organization_id: organizationId,
-                status: 0
-            })
-        );
+        const products = await Product.find({
+            organization_id: info.user.organization_id || info.user._id,
+            status: 0,
+        })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("category");
+
+        const totalCount = await Product.countDocuments({
+            organization_id: info.user.organization_id || info.user._id,
+            status: 0,
+        });
 
         res.json({
             success: true,
-            products
+            currentPage: page,
+            totalPages: Math.ceil(totalCount / limit),
+            totalDeletedProducts: totalCount,
+            products,
         });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// All Products with Optional Filters
 export const getProducts = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized"
-            });
+            return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
         const organizationId = info.user.organization_id || info.user._id;
 
-        // Pagination
+        const populateFields = [
+            { path: "category", select: "name" },
+            { path: "organization_id", select: "name email" },
+            { path: "owner_id", select: "name email" },
+        ];
+
+        const productId = req.query.id;
+        if (productId) {
+            const product = await Product.findOne({
+                _id: productId,
+                organization_id: organizationId,
+            }).populate(populateFields);
+
+            if (!product) {
+                return res.status(404).json({ success: false, message: "Product not found" });
+            }
+            return res.json({ success: true, product });
+        }
+
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(parseInt(req.query.limit) || 50, 100);
         const skip = (page - 1) * limit;
 
-        // Filters
+        const status = req.query.status !== undefined ? parseInt(req.query.status) : 1;
+        const search = req.query.search?.trim();
+
         const query = { organization_id: organizationId };
-
-        // Status filter
-        if (req.query.status !== undefined) {
-            query.status = parseInt(req.query.status);
-        } else {
-            query.status = 1; // Default to active products
-        }
-
-        // Category filter
-        if (req.query.category) {
-            query.category = new mongoose.Types.ObjectId(req.query.category);
-        }
-
-        // Owner filter
-        if (req.query.owner_id) {
-            query.owner_id = new mongoose.Types.ObjectId(req.query.owner_id);
-        }
-
-        // Search by name
-        if (req.query.search) {
-            query.name = { $regex: req.query.search, $options: "i" };
-        }
+        if (!isNaN(status)) query.status = status;
+        if (search) query.name = { $regex: search, $options: "i" };
 
         const [products, totalCount] = await Promise.all([
-            populateProductFields(Product.find(query))
+            Product.find(query)
+                .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
-                .sort({ createdAt: -1 }),
-            Product.countDocuments(query)
+                .populate(populateFields),
+            Product.countDocuments(query),
         ]);
 
         const totalPages = Math.ceil(totalCount / limit);
@@ -484,13 +437,10 @@ export const getProducts = async (req, res) => {
                 limit,
                 totalPages,
                 hasNextPage: page < totalPages,
-                hasPreviousPage: page > 1
-            }
+                hasPreviousPage: page > 1,
+            },
         });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };

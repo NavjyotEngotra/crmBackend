@@ -107,17 +107,27 @@ export const getContacts = async (req, res) => {
 
         const organizationId = info.user.organization_id || info.user.id;
 
-        // Get by ID
+        const populateFields = [
+            { path: "owner_id", select: "name email" },
+            { path: "company_id", select: "name email" },
+            { path: "organization_id", select: "name email" },
+            { path: "createdBy", select: "name email" },
+            { path: "updatedBy", select: "name email" },
+        ];
+
+        // Get single contact by ID
         const contactId = req.query.id;
         if (contactId) {
-            const contact = await Contact.findOne({ _id: contactId, organization_id: organizationId });
+            const contact = await Contact.findOne({ _id: contactId, organization_id: organizationId })
+                .populate(populateFields);
+
             if (!contact) {
                 return res.status(404).json({ success: false, message: "Contact not found" });
             }
             return res.json({ success: true, contact });
         }
 
-        // Pagination and filters
+        // Pagination + filters
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(parseInt(req.query.limit) || 50, 100);
         const skip = (page - 1) * limit;
@@ -130,7 +140,7 @@ export const getContacts = async (req, res) => {
         if (search) query.name = { $regex: search, $options: "i" };
 
         const [contacts, totalCount] = await Promise.all([
-            Contact.find(query).skip(skip).limit(limit),
+            Contact.find(query).skip(skip).limit(limit).populate(populateFields),
             Contact.countDocuments(query)
         ]);
 
@@ -152,6 +162,7 @@ export const getContacts = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
 
 // Get deleted contacts
 export const getDeletedContacts = async (req, res) => {

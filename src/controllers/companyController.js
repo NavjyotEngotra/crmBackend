@@ -15,7 +15,7 @@ export const createCompany = async (req, res) => {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
-        const { name, description, address, pincode, website, gstNo, owner_id, email ,phone } = req.body;
+        const { name, contacts,description, address, pincode, website, gstNo, owner_id, email ,phone } = req.body;
 
         // Check for duplicate name in same organization
         const existingCompany = await Company.findOne({
@@ -38,6 +38,7 @@ export const createCompany = async (req, res) => {
             pincode,
             email,
             website,
+            contacts,
             gstNo,
             phone,
             owner_id,
@@ -64,24 +65,28 @@ export const getCompanies = async (req, res) => {
 
         const organizationId = info.user.organization_id || info.user._id;
 
-        // Get single company by ID and its contacts
+        const populateFields = [
+            { path: "contacts" },
+            { path: "owner_id", select: "name email" },
+            { path: "organization_id", select: "name email" },
+            { path: "createdBy", select: "name email" },
+            { path: "updatedBy", select: "name email" },
+        ];
+
+        // Single company by ID
         const companyId = req.query.id;
         if (companyId) {
-            const company = await Company.findOne({ _id: companyId, organization_id: organizationId });
+            const company = await Company.findOne({ _id: companyId, organization_id: organizationId })
+                .populate(populateFields);
+
             if (!company) {
                 return res.status(404).json({ success: false, message: "Company not found" });
             }
 
-            const contacts = await Contact.find({ company_id: companyId, organization_id: organizationId });
-
-            return res.json({
-                success: true,
-                company,
-                contacts
-            });
+            return res.json({ success: true, company });
         }
 
-        // List companies with pagination + filters
+        // Multiple companies with pagination + filters
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(parseInt(req.query.limit) || 50, 100);
         const skip = (page - 1) * limit;
@@ -94,7 +99,10 @@ export const getCompanies = async (req, res) => {
         if (search) query.name = { $regex: search, $options: "i" };
 
         const [companies, total] = await Promise.all([
-            Company.find(query).skip(skip).limit(limit),
+            Company.find(query)
+                .skip(skip)
+                .limit(limit)
+                .populate(populateFields),
             Company.countDocuments(query)
         ]);
 
