@@ -54,6 +54,10 @@ router.use(verifyOrgOrTeamMember);
  *                 type: string
  *               amount:
  *                 type: number
+ *    quantity:
+ *                 type: number
+ *    commission:
+ *                 type: number
  *               tax:
  *                 type: number
  *               discount:

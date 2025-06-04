@@ -77,6 +77,14 @@ const leadSchema = new mongoose.Schema(
             default: 0,
             min: [0, "Discount cannot be negative"],
         },
+        quantity: {
+            type: Number,
+            min: [0, "Discount cannot be negative"],
+        },
+        commission: {
+            type: Number,
+            min: [0, "Discount cannot be negative"],
+        },
         meeting_id: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Meeting",
