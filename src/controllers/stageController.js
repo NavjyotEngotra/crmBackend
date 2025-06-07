@@ -54,20 +54,6 @@ export const createStage = async (req, res) => {
             });
         }
 
-        // Check if serial number already exists in the pipeline
-        const existingSerialNumber = await Stage.findOne({
-            serialNumber,
-            pipeline_id,
-            status: 1
-        });
-
-        if (existingSerialNumber) {
-            return res.status(400).json({
-                success: false,
-                message: "A stage with this serial number already exists in this pipeline"
-            });
-        }
-
         // Create stage
         const stage = new Stage({
             name,
@@ -287,22 +273,7 @@ export const updateStage = async (req, res) => {
             }
         }
 
-        // If serial number is being updated, check for uniqueness
-        if (serialNumber && serialNumber !== stage.serialNumber) {
-            const existingSerialNumber = await Stage.findOne({
-                serialNumber,
-                pipeline_id: stage.pipeline_id,
-                status: 1,
-                _id: { $ne: id }
-            });
-
-            if (existingSerialNumber) {
-                return res.status(400).json({
-                    success: false,
-                    message: "A stage with this serial number already exists in this pipeline"
-                });
-            }
-        }
+    
 
         // Update stage
         if (name) stage.name = name;
@@ -398,20 +369,12 @@ export const createStages = async (req, res) => {
                 });
             }
 
-            // Check for duplicate serial numbers within the request
-            if (new Set(serialNumbers).size !== serialNumbers.length) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Duplicate serial numbers found for pipeline ${pipelineId}`
-                });
-            }
 
             // Check for existing stages with same names or serial numbers
             const existingStages = await Stage.find({
                 pipeline_id: pipelineId,
                 $or: [
                     { name: { $in: stageNames } },
-                    { serialNumber: { $in: serialNumbers } }
                 ],
                 status: 1
             });
@@ -419,7 +382,7 @@ export const createStages = async (req, res) => {
             if (existingStages.length > 0) {
                 return res.status(400).json({
                     success: false,
-                    message: `Stages with duplicate names or serial numbers already exist in pipeline ${pipelineId}`
+                    message: `Stages with duplicate names  already exist in pipeline ${pipelineId}`
                 });
             }
         }
@@ -443,7 +406,7 @@ export const createStages = async (req, res) => {
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
-                message: "Duplicate stage names or serial numbers found"
+                message: "Duplicate stage names  found"
             });
         }
         res.status(500).json({
@@ -455,167 +418,135 @@ export const createStages = async (req, res) => {
 
 // Update Multiple Stages
 export const updateStages = async (req, res) => {
-    try {
-        const { stages } = req.body;
-        const { type, user } = req.user;
+  try {
+    const { stages } = req.body;
+    const { type, user } = req.user;
 
-        if (!Array.isArray(stages) || stages.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Please provide an array of stages to update"
-            });
-        }
-
-        // Get organization_id based on user type
-        let organization_id;
-        if (type === "organization") {
-            organization_id = user._id;
-        } else if (type === "teamMember") {
-            organization_id = user.organization_id;
-        }
-
-        const stageIds = stages.map(stage => stage._id);
-        const existingStages = await Stage.find({
-            _id: { $in: stageIds },
-            organization_id
-        });
-
-        if (existingStages.length !== stageIds.length) {
-            return res.status(404).json({
-                success: false,
-                message: "One or more stages not found or access denied"
-            });
-        }
-
-        // Get unique pipeline IDs from existing stages
-        const pipelineIds = [...new Set(existingStages.map(stage => stage.pipeline_id.toString()))];
-
-        // Verify user has access to all pipelines
-        const pipelines = await Pipeline.find({
-            _id: { $in: pipelineIds },
-            organization_id,
-            status: 1
-        });
-
-        // For team members, check if they have access to all pipelines
-        if (type === "teamMember") {
-            const hasAccessToAll = pipelines.every(pipeline => 
-                pipeline.users_has_access.includes(user._id)
-            );
-
-            if (!hasAccessToAll) {
-                return res.status(403).json({
-                    success: false,
-                    message: "You don't have access to one or more pipelines"
-                });
-            }
-        }
-
-        // Group stages by pipeline for validation
-        const stagesByPipeline = {};
-        for (const stage of stages) {
-            const existingStage = existingStages.find(es => es._id.toString() === stage._id);
-            const pipelineId = existingStage.pipeline_id.toString();
-            
-            if (!stagesByPipeline[pipelineId]) {
-                stagesByPipeline[pipelineId] = [];
-            }
-            stagesByPipeline[pipelineId].push({
-                ...stage,
-                existingStage
-            });
-        }
-
-        // Validate updates for each pipeline
-        for (const [pipelineId, pipelineStages] of Object.entries(stagesByPipeline)) {
-            // Check for duplicate names and serial numbers within updates
-            const namesMap = new Map();
-            const serialNumbersMap = new Map();
-
-            for (const stage of pipelineStages) {
-                if (stage.name) {
-                    if (namesMap.has(stage.name)) {
-                        return res.status(400).json({
-                            success: false,
-                            message: `Duplicate stage name "${stage.name}" found in updates for pipeline ${pipelineId}`
-                        });
-                    }
-                    namesMap.set(stage.name, stage._id);
-                }
-
-                if (stage.serialNumber) {
-                    if (serialNumbersMap.has(stage.serialNumber)) {
-                        return res.status(400).json({
-                            success: false,
-                            message: `Duplicate serial number ${stage.serialNumber} found in updates for pipeline ${pipelineId}`
-                        });
-                    }
-                    serialNumbersMap.set(stage.serialNumber, stage._id);
-                }
-            }
-
-            // Check for conflicts with existing stages
-            const existingStagesInPipeline = await Stage.find({
-                pipeline_id: pipelineId,
-                _id: { $nin: stageIds },
-                status: 1
-            });
-
-            for (const existingStage of existingStagesInPipeline) {
-                if (namesMap.has(existingStage.name)) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `Stage name "${existingStage.name}" already exists in pipeline ${pipelineId}`
-                    });
-                }
-
-                if (serialNumbersMap.has(existingStage.serialNumber)) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `Serial number ${existingStage.serialNumber} already exists in pipeline ${pipelineId}`
-                    });
-                }
-            }
-        }
-
-        // Perform updates
-        const updatedStages = await Promise.all(stages.map(async (stage) => {
-            const { _id, name, serialNumber, stageType, status } = stage;
-            const update = {};
-            
-            if (name) update.name = name;
-            if (serialNumber) update.serialNumber = serialNumber;
-            if (stageType) update.stageType = stageType;
-            if (status !== undefined) update.status = parseInt(status);
-            update.updated_by = user._id;
-
-            return Stage.findOneAndUpdate(
-                { _id, organization_id },
-                update,
-                { new: true }
-            ).populate('created_by', 'name email')
-             .populate('updated_by', 'name email')
-             .populate('pipeline_id', 'name');
-        }));
-
-        res.json({
-            success: true,
-            message: "Stages updated successfully",
-            stages: updatedStages
-        });
-    } catch (error) {
-        if (error.code === 11000) {
-            return res.status(400).json({
-                success: false,
-                message: "Duplicate stage names or serial numbers found"
-            });
-        }
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+    if (!Array.isArray(stages) || stages.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide an array of stages to update or create",
+      });
     }
-}; 
+
+    // Get organization_id based on user type
+    let organization_id;
+    if (type === "organization") {
+      organization_id = user._id;
+    } else if (type === "teamMember") {
+      organization_id = user.organization_id;
+    } else {
+      return res.status(403).json({
+        success: false,
+        message: "Invalid user type",
+      });
+    }
+
+    // Separate stages into existing (have _id) and new (no _id)
+    const stagesToUpdate = stages.filter(stage => stage._id);
+    const stagesToCreate = stages.filter(stage => !stage._id);
+
+    // Validate existing stages belong to the organization
+    const stageIds = stagesToUpdate.map(stage => stage._id);
+    const existingStages = await Stage.find({
+      _id: { $in: stageIds },
+      organization_id,
+    });
+
+    if (existingStages.length !== stageIds.length) {
+      return res.status(404).json({
+        success: false,
+        message: "One or more stages to update not found or access denied",
+      });
+    }
+
+    // Get unique pipeline IDs from existing stages and new stages (assuming pipeline_id is provided for new)
+    const pipelineIdsExisting = existingStages.map(stage => stage.pipeline_id.toString());
+    const pipelineIdsNew = stagesToCreate
+      .map(stage => stage.pipeline_id)
+      .filter(id => !!id)
+      .map(id => id.toString());
+
+    const pipelineIds = [...new Set([...pipelineIdsExisting, ...pipelineIdsNew])];
+
+    // Verify user has access to all pipelines
+    const pipelines = await Pipeline.find({
+      _id: { $in: pipelineIds },
+      organization_id,
+      status: 1,
+    });
+
+    if (type === "teamMember") {
+      const hasAccessToAll = pipelines.every(pipeline =>
+        pipeline.users_has_access.some(id => id.toString() === user._id.toString())
+      );
+
+      if (!hasAccessToAll) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have access to one or more pipelines",
+        });
+      }
+    }
+
+    // Update existing stages
+    const updatedStages = await Promise.all(
+      stagesToUpdate.map(async (stage) => {
+        const { _id, name, serialNumber, stageType, status } = stage;
+        const update = {};
+
+        if (name !== undefined) update.name = name;
+        if (serialNumber !== undefined) update.serialNumber = serialNumber;
+        if (stageType !== undefined) update.stageType = stageType;
+        if (status !== undefined) update.status = parseInt(status);
+        update.updated_by = user._id; // assuming schema field is updated_by
+
+        return Stage.findOneAndUpdate(
+          { _id, organization_id },
+          update,
+          { new: true }
+        );
+      })
+    );
+
+    // Create new stages
+    const createdStages = await Promise.all(
+      stagesToCreate.map(async (stage) => {
+        // stage must contain at least: name, serialNumber, stageType, pipeline_id
+        const newStage = new Stage({
+          ...stage,
+          organization_id,
+          created_by: user._id,
+          updated_by: user._id,
+          status: stage.status !== undefined ? stage.status : 1,
+        });
+        return newStage.save();
+      })
+    );
+
+    // Return combined result
+    const allStages = [...updatedStages, ...createdStages];
+
+    res.json({
+      success: true,
+      message: "Stages updated and created successfully",
+      stages: allStages,
+    });
+
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Duplicate key error",
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 
 // export const swapSerialNumbers = async (req, res) => {
 //   try {
