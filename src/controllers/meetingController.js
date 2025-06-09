@@ -103,8 +103,22 @@ export const getMeetings = async (req, res) => {
             organization_id: info.user.organization_id || info.user._id
         };
 
+        // Filter by status if provided
         if (req.query.status !== undefined) {
             query.status = parseInt(req.query.status);
+        }
+
+        // Filter by date range if `from` and/or `to` are provided
+        if (req.query.from || req.query.to) {
+            query.from = {};
+
+            if (req.query.from) {
+                query.from.$gte = new Date(req.query.from);
+            }
+
+            if (req.query.to) {
+                query.from.$lte = new Date(req.query.to);
+            }
         }
 
         const [meetings, total] = await Promise.all([

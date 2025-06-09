@@ -14,7 +14,7 @@ export const createContact = async (req, res) => {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
-        const { name, phoneno, address, pincode, owner_id, email, company_id, title } = req.body;
+        const { name,designation, phoneno, address, pincode, owner_id, email, company_id, title } = req.body;
 
 
         const existing = await Contact.findOne({
@@ -33,6 +33,7 @@ export const createContact = async (req, res) => {
             organization_id: info.user.organization_id || info.user._id,
             name,
             email,
+            designation,
             phoneno,
             owner_id,
             title,
