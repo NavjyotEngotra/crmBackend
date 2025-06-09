@@ -370,3 +370,37 @@ export const searchLeadsByName = async (req, res) => {
         });
     }
 }; 
+
+export const deleteLeadPermanently = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Extract and verify token
+        const token = req.headers.authorization?.split(" ")[1];
+        const info = await getUserInfo(token);
+        const userOrgId = info.user.organization_id || info.user._id;
+
+        // Check and delete the lead
+        const deletedLead = await Lead.findOneAndDelete({
+            _id: id,
+            organization_id: userOrgId
+        });
+
+        if (!deletedLead) {
+            return res.status(404).json({
+                success: false,
+                message: "Lead not found or does not belong to your organization."
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Lead permanently deleted."
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Server error: " + error.message
+        });
+    }
+};

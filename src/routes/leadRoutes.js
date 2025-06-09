@@ -6,7 +6,8 @@ import {
     updateLead,
     updateStatus,
     getDeletedLeads,
-    searchLeadsByName
+    searchLeadsByName,
+    deleteLeadPermanently
 } from "../controllers/leadController.js";
 import { verifyOrgOrTeamMember } from "../middlewares/combinedAuthMiddleware.js";
 
@@ -163,6 +164,8 @@ router.get("/search", searchLeadsByName);
  */
 router.get("/deleted", getDeletedLeads);
 
+
+
 /**
  * @swagger
  * /api/lead/{id}:
@@ -275,5 +278,8 @@ router.put("/:id", updateLead);
  *         description: Lead not found
  */
 router.put("/status/:id", updateStatus);
+
+
+router.delete("/deleteLeadPermanently/:id",deleteLeadPermanently);
 
 export default router; 

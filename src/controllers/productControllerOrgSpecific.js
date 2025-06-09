@@ -154,7 +154,7 @@ export const updateProduct = async (req, res) => {
         }
 
         delete updateData.organization_id;
-        delete updateData.status;
+        // delete updateData.status;
 
         const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
             new: true,
