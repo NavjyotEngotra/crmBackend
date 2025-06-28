@@ -10,17 +10,18 @@ import {
     getOwnedContacts
 } from "../controllers/contactController.js";
 import { isAdmin } from "../middlewares/authMiddleware.js";
+import { checkPermission } from "../middlewares/checkPermission.js";
 
 const router = express.Router();
 
-router.post("/", createContact);
-router.put("/:id", updateContact);
-router.get("/", getContacts);
-router.get("/deleted", getDeletedContacts);
-router.put("/update-status/:id",isAdmin, updateStatus);
-router.get("/search", searchContactsByName);
-router.get("/getOwnedContacts", getOwnedContacts);
-router.get("/:id", getContactById);
+router.post("/",checkPermission("contact.create"), createContact);
+router.put("/:id",checkPermission("contact.update"), updateContact);
+router.get("/",checkPermission("contact.read"), getContacts);
+router.get("/deleted",checkPermission("contact.read"), getDeletedContacts);
+router.put("/update-status/:id",checkPermission("contact.update"),isAdmin, updateStatus);
+router.get("/search",checkPermission("contact.read"), searchContactsByName);
+router.get("/getOwnedContacts",checkPermission("contact.read"), getOwnedContacts);
+router.get("/:id",checkPermission("contact.read"), getContactById);
 
 
 export default router;

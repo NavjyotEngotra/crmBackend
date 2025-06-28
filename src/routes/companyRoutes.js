@@ -10,6 +10,7 @@ import {
     getOwnedCompanies
 } from "../controllers/companyController.js";
 import { isAdmin } from "../middlewares/authMiddleware.js";
+import { checkPermission } from "../middlewares/checkPermission.js";
 
 const router = express.Router();
 
@@ -40,7 +41,7 @@ const router = express.Router();
  *       401:
  *         description: Unauthorized
  */
-router.post("/", createCompany);
+router.post("/",checkPermission("company.create"), createCompany);
 
 /**
  * @swagger
@@ -56,7 +57,7 @@ router.post("/", createCompany);
  *       401:
  *         description: Unauthorized
  */
-router.get("/", getCompanies);
+router.get("/",checkPermission("company.read"), getCompanies);
 
 /**
  * @swagger
@@ -78,7 +79,7 @@ router.get("/", getCompanies);
  *       401:
  *         description: Unauthorized
  */
-router.get("/search", searchCompaniesByName);
+router.get("/search",checkPermission("company.read"), searchCompaniesByName);
 
 /**
  * @swagger
@@ -94,7 +95,7 @@ router.get("/search", searchCompaniesByName);
  *       401:
  *         description: Unauthorized
  */
-router.get("/deleted", getDeletedCompanies);
+router.get("/deleted",checkPermission("company.read"), getDeletedCompanies);
 
 /**
  * @swagger
@@ -110,7 +111,7 @@ router.get("/deleted", getDeletedCompanies);
  *       401:
  *         description: Unauthorized
  */
-router.get("/getOwnedCompanies", getOwnedCompanies);
+router.get("/getOwnedCompanies",checkPermission("company.read"), getOwnedCompanies);
 
 /**
  * @swagger
@@ -134,7 +135,7 @@ router.get("/getOwnedCompanies", getOwnedCompanies);
  *       404:
  *         description: Company not found
  */
-router.get("/:id", getCompanyById);
+router.get("/:id",checkPermission("company.read"), getCompanyById);
 
 /**
  * @swagger
@@ -169,7 +170,7 @@ router.get("/:id", getCompanyById);
  *       404:
  *         description: Company not found
  */
-router.put("/:id", updateCompany);
+router.put("/:id",checkPermission("company.update"), updateCompany);
 
 /**
  * @swagger
@@ -202,7 +203,7 @@ router.put("/:id", updateCompany);
  *       403:
  *         description: Admin access required
  */
-router.put("/update-status/:id", isAdmin, updateStatus);
+router.put("/update-status/:id",checkPermission("company.update"), isAdmin, updateStatus);
 
 
 export default router;

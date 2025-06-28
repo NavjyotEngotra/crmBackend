@@ -10,6 +10,7 @@ import {
     deleteLeadPermanently
 } from "../controllers/leadController.js";
 import { verifyOrgOrTeamMember } from "../middlewares/combinedAuthMiddleware.js";
+import { checkPermission } from "../middlewares/checkPermission.js";
 
 const router = express.Router();
 
@@ -71,7 +72,7 @@ router.use(verifyOrgOrTeamMember);
  *       401:
  *         description: Unauthorized
  */
-router.post("/", createLead);
+router.post("/",checkPermission("lead.create"), createLead);
 
 /**
  * @swagger
@@ -123,7 +124,7 @@ router.post("/", createLead);
  *       401:
  *         description: Unauthorized
  */
-router.get("/", getLeads);
+router.get("/",checkPermission("lead.read"), getLeads);
 
 /**
  * @swagger
@@ -146,7 +147,7 @@ router.get("/", getLeads);
  *       401:
  *         description: Unauthorized
  */
-router.get("/search", searchLeadsByName);
+router.get("/search",checkPermission("lead.read"), searchLeadsByName);
 
 /**
  * @swagger
@@ -162,7 +163,7 @@ router.get("/search", searchLeadsByName);
  *       401:
  *         description: Unauthorized
  */
-router.get("/deleted", getDeletedLeads);
+router.get("/deleted",checkPermission("lead.read"), getDeletedLeads);
 
 
 
@@ -188,7 +189,7 @@ router.get("/deleted", getDeletedLeads);
  *       404:
  *         description: Lead not found
  */
-router.get("/:id", getLeadById);
+router.get("/:id",checkPermission("lead.read"), getLeadById);
 
 /**
  * @swagger
@@ -241,7 +242,7 @@ router.get("/:id", getLeadById);
  *       404:
  *         description: Lead not found
  */
-router.put("/:id", updateLead);
+router.put("/:id",checkPermission("lead.update"), updateLead);
 
 /**
  * @swagger
@@ -277,9 +278,9 @@ router.put("/:id", updateLead);
  *       404:
  *         description: Lead not found
  */
-router.put("/status/:id", updateStatus);
+router.put("/status/:id",checkPermission("lead.update"), updateStatus);
 
 
-router.delete("/deleteLeadPermanently/:id",deleteLeadPermanently);
+router.delete("/deleteLeadPermanently/:id",checkPermission("lead.delete"),deleteLeadPermanently);
 
 export default router; 

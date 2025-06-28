@@ -5,6 +5,7 @@ import {
     getCategoryById,
     updateCategory,
 }  from "../controllers/categoryController.js";
+import { checkPermission } from "../middlewares/checkPermission.js";
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ const router = express.Router();
  *       401:
  *         description: Unauthorized
  */
-router.post("/", createCategory);
+router.post("/",checkPermission("catagory.create"), createCategory);
 
 /**
  * @swagger
@@ -49,7 +50,7 @@ router.post("/", createCategory);
  *       401:
  *         description: Unauthorized
  */
-router.get("/", getCategories);
+router.get("/",checkPermission("catagory.read"), getCategories);
 
 /**
  * @swagger
@@ -73,7 +74,7 @@ router.get("/", getCategories);
  *       404:
  *         description: Category not found
  */
-router.get("/:id", getCategoryById);
+router.get("/:id",checkPermission("catagory.read"), getCategoryById);
 
 /**
  * @swagger
@@ -106,6 +107,6 @@ router.get("/:id", getCategoryById);
  *       404:
  *         description: Category not found
  */
-router.put("/:id", updateCategory);
+router.put("/:id",checkPermission("catagory.update"), updateCategory);
 
 export default router;

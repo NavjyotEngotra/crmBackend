@@ -136,3 +136,37 @@ export const verifyToken = async (req, res, next) => {
         });
     }
 };
+
+export const verifyAnyAuth = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized, token required" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (decoded.role === "superadmin") {
+      req.user = { id: decoded.id, role: "superadmin" };
+      next();
+    } else if (decoded.role === "organization") {
+      req.user = { id: decoded.id, role: "organization" };
+      next();
+    } else {
+      // team member check
+      const teamMember = await TeamMember.findById(decoded.id);
+      if (!teamMember || teamMember.status !== 1) {
+        return res.status(401).json({ message: "Unauthorized team member" });
+      }
+      req.user = {
+        id: decoded.id,
+        role: "team_member",
+        organizationId: teamMember.organization_id,
+      };
+      next();
+    }
+  } catch (error) {
+    console.error("verifyAnyAuth error:", error.message);
+    return res.status(401).json({ message: "Invalid token" });
+  }
+};

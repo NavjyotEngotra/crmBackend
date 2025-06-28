@@ -25,6 +25,8 @@ import pipelineRoutes from "./routes/pipelineRoutes.js";
 import stageRoutes from "./routes/stageRoutes.js";
 import leadRoutes from "./routes/leadRoutes.js";
 import authRoute from "./routes/authRoutes.js";
+import permissionRoute from "./routes/permissionRoutes.js"
+import teamMemberPermissionRoute from "./routes/teamMemberPermissionRoutes.js"
 
 // Import models to ensure they are registered
 import "./models/index.js";
@@ -88,6 +90,8 @@ app.use("/api/pipeline", pipelineRoutes);
 app.use("/api/stage", stageRoutes);
 app.use("/api/lead", leadRoutes);
 app.use("/api/auth",authRoute);
+app.use("/api/permission",permissionRoute)
+app.use("/api/assignPermission",teamMemberPermissionRoute)
 
 
 ;(async()=>{

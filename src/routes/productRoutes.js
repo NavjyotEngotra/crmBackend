@@ -11,6 +11,7 @@ import {
     getOwnedProducts
 } from "../controllers/productControllerOrgSpecific.js";
 import { verifyOrgOrTeamMember } from "../middlewares/combinedAuthMiddleware.js";
+import { checkPermission } from "../middlewares/checkPermission.js";
 
 const router = express.Router();
 
@@ -63,7 +64,7 @@ const router = express.Router();
  *       401:
  *         description: Unauthorized
  */
-router.post("/", verifyOrgOrTeamMember, createProduct);
+router.post("/",checkPermission("product.create"), verifyOrgOrTeamMember, createProduct);
 
 /**
  * @swagger
@@ -79,14 +80,14 @@ router.post("/", verifyOrgOrTeamMember, createProduct);
  *       401:
  *         description: Unauthorized
  */
-router.get("/", getProducts);
+router.get("/",checkPermission("product.read"), getProducts);
 
-router.put("/update-status/:id" ,updateStatus);
-router.put("/:id", verifyOrgOrTeamMember, updateProduct);
-router.get("/getOwnedProducts", getOwnedProducts);
-router.get("/deleted", getDeletedProducts);
-router.get("/search", searchProductsByName);
-router.get("/search-by-catagory", searchProductsByCategory);
-router.get("/:id", getProductById);
+router.put("/update-status/:id" ,checkPermission("product.update"),updateStatus);
+router.put("/:id", verifyOrgOrTeamMember,checkPermission("product.update"), updateProduct);
+router.get("/getOwnedProducts",checkPermission("product.read"), getOwnedProducts);
+router.get("/deleted",checkPermission("product.read"), getDeletedProducts);
+router.get("/search",checkPermission("product.read"), searchProductsByName);
+router.get("/search-by-catagory",checkPermission("product.read"), searchProductsByCategory);
+router.get("/:id",checkPermission("product.read"), getProductById);
 
 export default router;
