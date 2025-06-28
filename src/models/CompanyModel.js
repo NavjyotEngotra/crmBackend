@@ -16,12 +16,12 @@ const companySchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "TeamMember",
         },
-        contacts: [
-            {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "Contact",
-            }
-        ],
+        // contacts: [
+        //     {
+        //         type: mongoose.Schema.Types.ObjectId,
+        //         ref: "Contact",
+        //     },
+        // ],
         description: {
             type: String,
             trim: true,
@@ -68,5 +68,16 @@ const companySchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+// 🔹 Add this:
+companySchema.virtual("contactList", {
+    ref: "Contact",
+    localField: "_id",
+    foreignField: "company_id",
+    justOne: false,
+});
+
+companySchema.set("toObject", { virtuals: true });
+companySchema.set("toJSON", { virtuals: true });
 
 export default mongoose.model("Company", companySchema);

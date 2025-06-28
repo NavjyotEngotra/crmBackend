@@ -4,7 +4,6 @@ import jwt from "jsonwebtoken";
 import { getUserInfo } from "../utilities/getUserInfo.js";
 import Contact from "../models/ContactModel.js"; // import your Contact model
 
-
 // Create Company
 export const createCompany = async (req, res) => {
     try {
@@ -12,21 +11,34 @@ export const createCompany = async (req, res) => {
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
+            return res
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
         }
 
-        const { name, contacts,description, address, pincode, website, gstNo, owner_id, email ,phone } = req.body;
+        const {
+            name,
+            // contacts,
+            description,
+            address,
+            pincode,
+            website,
+            gstNo,
+            owner_id,
+            email,
+            phone,
+        } = req.body;
 
         // Check for duplicate name in same organization
         const existingCompany = await Company.findOne({
             organization_id: info.user.organization_id || info.user._id,
-            name: { $regex: new RegExp(`^${name}$`, 'i') }, // case-insensitive match
+            name: { $regex: new RegExp(`^${name}$`, "i") }, // case-insensitive match
         });
 
         if (existingCompany) {
             return res.status(409).json({
                 success: false,
-                message: "Company with the same name already exists"
+                message: "Company with the same name already exists",
             });
         }
 
@@ -38,7 +50,7 @@ export const createCompany = async (req, res) => {
             pincode,
             email,
             website,
-            contacts,
+            // contacts,
             gstNo,
             phone,
             owner_id,
@@ -48,7 +60,11 @@ export const createCompany = async (req, res) => {
 
         await newCompany.save();
 
-        res.status(201).json({ success: true, message: "Company created", company: newCompany });
+        res.status(201).json({
+            success: true,
+            message: "Company created",
+            company: newCompany,
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -60,13 +76,15 @@ export const getCompanies = async (req, res) => {
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
+            return res
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
         }
 
         const organizationId = info.user.organization_id || info.user._id;
 
         const populateFields = [
-            { path: "contacts" },
+            { path: "contactList" },
             { path: "owner_id", select: "name email" },
             { path: "organization_id", select: "name email" },
             { path: "createdBy", select: "name email" },
@@ -76,11 +94,15 @@ export const getCompanies = async (req, res) => {
         // Single company by ID
         const companyId = req.query.id;
         if (companyId) {
-            const company = await Company.findOne({ _id: companyId, organization_id: organizationId })
-                .populate(populateFields);
+            const company = await Company.findOne({
+                _id: companyId,
+                organization_id: organizationId,
+            }).populate(populateFields);
 
             if (!company) {
-                return res.status(404).json({ success: false, message: "Company not found" });
+                return res
+                    .status(404)
+                    .json({ success: false, message: "Company not found" });
             }
 
             return res.json({ success: true, company });
@@ -91,7 +113,8 @@ export const getCompanies = async (req, res) => {
         const limit = Math.min(parseInt(req.query.limit) || 50, 100);
         const skip = (page - 1) * limit;
 
-        const status = req.query.status !== undefined ? parseInt(req.query.status) : 1;
+        const status =
+            req.query.status !== undefined ? parseInt(req.query.status) : 1;
         const search = req.query.search?.trim();
 
         const query = { organization_id: organizationId };
@@ -103,7 +126,7 @@ export const getCompanies = async (req, res) => {
                 .skip(skip)
                 .limit(limit)
                 .populate(populateFields),
-            Company.countDocuments(query)
+            Company.countDocuments(query),
         ]);
 
         const totalPages = Math.ceil(total / limit);
@@ -118,7 +141,7 @@ export const getCompanies = async (req, res) => {
                 totalPages,
                 hasNextPage: page < totalPages,
                 hasPreviousPage: page > 1,
-            }
+            },
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -132,7 +155,9 @@ export const getDeletedCompanies = async (req, res) => {
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
+            return res
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
         }
 
         const page = parseInt(req.query.page) || 1;
@@ -140,10 +165,16 @@ export const getDeletedCompanies = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const [companies, total] = await Promise.all([
-            Company.find({ organization_id: (info.user.organization_id || info.user._id), status: 0 })
+            Company.find({
+                organization_id: info.user.organization_id || info.user._id,
+                status: 0,
+            })
                 .skip(skip)
                 .limit(limit),
-            Company.countDocuments({ organization_id: (info.user.organization_id || info.user._id), status: 0 })
+            Company.countDocuments({
+                organization_id: info.user.organization_id || info.user._id,
+                status: 0,
+            }),
         ]);
         res.json({
             success: true,
@@ -153,7 +184,7 @@ export const getDeletedCompanies = async (req, res) => {
                 page,
                 totalPages: Math.ceil(total / limit),
                 hasNextPage: skip + companies.length < total,
-            }
+            },
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -169,19 +200,25 @@ export const getCompanyById = async (req, res) => {
 
         const company = await Company.findById(req.params.id);
 
-        if (!company || company.organization_id.toString() !== teamMember.organization_id.toString()) {
-            return res.status(403).json({ success: false, message: "Company not found" });
+        if (
+            !company ||
+            company.organization_id.toString() !==
+                teamMember.organization_id.toString()
+        ) {
+            return res
+                .status(403)
+                .json({ success: false, message: "Company not found" });
         }
 
         const contacts = await Contact.find({
             company_id: company._id,
-            organization_id: teamMember.organization_id
+            organization_id: teamMember.organization_id,
         });
 
         res.json({
             success: true,
             company,
-            contacts
+            contacts,
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -195,7 +232,9 @@ export const updateCompany = async (req, res) => {
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
+            return res
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
         }
 
         const { id } = req.params;
@@ -204,18 +243,22 @@ export const updateCompany = async (req, res) => {
 
         const company = await Company.findById(id);
 
-        if (!company || company.organization_id.toString() !== (info.user.organization_id||info.user._id).toString()) {
-            return res.status(403).json({ success: false, message: "Company not found" });
+        if (
+            !company ||
+            company.organization_id.toString() !==
+                (info.user.organization_id || info.user._id).toString()
+        ) {
+            return res
+                .status(403)
+                .json({ success: false, message: "Company not found" });
         }
 
         // 🔒 Check for uniqueness of name and code within the same organization
         if (updateData.name) {
             const duplicateProduct = await Company.findOne({
                 _id: { $ne: id },
-                organization_id: info.user.organization_id||info.user._id,
-                $or: [
-                    updateData.name ? { name: updateData.name } : {},
-                ],
+                organization_id: info.user.organization_id || info.user._id,
+                $or: [updateData.name ? { name: updateData.name } : {}],
             });
 
             if (duplicateProduct) {
@@ -228,9 +271,15 @@ export const updateCompany = async (req, res) => {
 
         updateData.updatedBy = info.user._id;
 
-        const updatedCompany = await Company.findByIdAndUpdate(id, updateData, { new: true });
+        const updatedCompany = await Company.findByIdAndUpdate(id, updateData, {
+            new: true,
+        });
 
-        res.json({ success: true, message: "Company updated", company: updatedCompany });
+        res.json({
+            success: true,
+            message: "Company updated",
+            company: updatedCompany,
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -246,8 +295,14 @@ export const updateStatus = async (req, res) => {
         const { id } = req.params;
 
         const company = await Company.findById(id);
-        if (!company || company.organization_id.toString() !== teamMember.organization_id.toString()) {
-            return res.status(403).json({ success: false, message: "Company not found" });
+        if (
+            !company ||
+            company.organization_id.toString() !==
+                teamMember.organization_id.toString()
+        ) {
+            return res
+                .status(403)
+                .json({ success: false, message: "Company not found" });
         }
         const { status } = req.body;
         company.status = status;
@@ -267,17 +322,22 @@ export const searchCompaniesByName = async (req, res) => {
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
+            return res
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
         }
 
         const { name } = req.query;
         if (!name) {
-            return res.status(400).json({ success: false, message: "Query parameter 'name' is required" });
+            return res.status(400).json({
+                success: false,
+                message: "Query parameter 'name' is required",
+            });
         }
 
         const companies = await Company.find({
             organization_id: info.user.organization_id || info.user._id,
-            name: { $regex: name, $options: "i" }
+            name: { $regex: name, $options: "i" },
         }).select("-__v");
 
         res.json({ success: true, companies });
@@ -290,13 +350,18 @@ export const searchCompaniesByName = async (req, res) => {
 export const getOwnedCompanies = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        if (!token) return res.status(401).json({ success: false, message: "Token missing" });
+        if (!token)
+            return res
+                .status(401)
+                .json({ success: false, message: "Token missing" });
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const teamMember = await TeamMember.findById(decoded.id);
 
         if (!teamMember || teamMember.status !== 1)
-            return res.status(401).json({ success: false, message: "Unauthorized" });
+            return res
+                .status(401)
+                .json({ success: false, message: "Unauthorized" });
 
         const companies = await Company.find({
             organization_id: teamMember.organization_id,
