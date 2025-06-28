@@ -24,6 +24,7 @@ import meetingRoutes from "./routes/meetingRoutes.js";
 import pipelineRoutes from "./routes/pipelineRoutes.js";
 import stageRoutes from "./routes/stageRoutes.js";
 import leadRoutes from "./routes/leadRoutes.js";
+import authRoute from "./routes/authRoutes.js";
 
 // Import models to ensure they are registered
 import "./models/index.js";
@@ -86,12 +87,8 @@ app.use("/api/meeting", meetingRoutes);
 app.use("/api/pipeline", pipelineRoutes);
 app.use("/api/stage", stageRoutes);
 app.use("/api/lead", leadRoutes);
+app.use("/api/auth",authRoute);
 
-
-
-// app.get("/razorpay", (req, res) => {
-//   res.render("razorpay"); // Render the Razorpay button
-// });
 
 ;(async()=>{
   try{
