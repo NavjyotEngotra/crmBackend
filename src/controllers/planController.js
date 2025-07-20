@@ -1,44 +1,38 @@
 import Plan from "../models/Plan.js";
+import responseSender from "../utilities/responseSender.js";
 
 export const createPlan = async (req, res) => {
     try {
         const { title, price, description, duration } = req.body;
 
-        // Validate input
         if (!title || !price || !duration) {
-            return res.status(400).json({ message: "Title, price, and duration are required" });
+            return responseSender(res, 400, false, null, "Title, price, and duration are required");
         }
 
-        // Create new plan
         const newPlan = new Plan({ title, price, description, duration });
         await newPlan.save();
 
-        return res.status(201).json({
-            message: "Plan created successfully",
-            plan: newPlan,
-        });
+        return responseSender(res, 201, true, { plan: newPlan }, "Plan created successfully");
     } catch (error) {
-        return res.status(500).json({ message: "Server error", error: error.message });
+        return responseSender(res, 500, false, { error: error.message }, "Server error");
     }
 };
-
 
 export const getAllPlans = async (req, res) => {
     try {
         const plans = await Plan.find();
-        return res.status(200).json(plans);
+        return responseSender(res, 200, true, { plans }, "All plans retrieved");
     } catch (error) {
-        return res.status(500).json({ message: "Server error", error: error.message });
+        return responseSender(res, 500, false, { error: error.message }, "Server error");
     }
 };
 
 export const getActivePlans = async (req, res) => {
     try {
-        const plans = await Plan.find({ status: 1 }); //  Fetch only active plans
-
-        return res.status(200).json(plans);
+        const plans = await Plan.find({ status: 1 });
+        return responseSender(res, 200, true, { plans }, "Active plans retrieved");
     } catch (error) {
-        return res.status(500).json({ message: "Server error", error: error.message });
+        return responseSender(res, 500, false, { error: error.message }, "Server error");
     }
 };
 
@@ -46,11 +40,11 @@ export const getPlanById = async (req, res) => {
     try {
         const plan = await Plan.findById(req.params.id);
         if (!plan) {
-            return res.status(404).json({ message: "Plan not found" });
+            return responseSender(res, 404, false, null, "Plan not found");
         }
-        return res.status(200).json(plan);
+        return responseSender(res, 200, true, { plan }, "Plan found");
     } catch (error) {
-        return res.status(500).json({ message: "Server error", error: error.message });
+        return responseSender(res, 500, false, { error: error.message }, "Server error");
     }
 };
 
@@ -65,15 +59,12 @@ export const updatePlan = async (req, res) => {
         );
 
         if (!updatedPlan) {
-            return res.status(404).json({ message: "Plan not found" });
+            return responseSender(res, 404, false, null, "Plan not found");
         }
 
-        return res.status(200).json({
-            message: "Plan updated successfully",
-            plan: updatedPlan,
-        });
+        return responseSender(res, 200, true, { plan: updatedPlan }, "Plan updated successfully");
     } catch (error) {
-        return res.status(500).json({ message: "Server error", error: error.message });
+        return responseSender(res, 500, false, { error: error.message }, "Server error");
     }
 };
 
@@ -81,12 +72,12 @@ export const deletePlan = async (req, res) => {
     try {
         const deletedPlan = await Plan.findByIdAndDelete(req.params.id);
         if (!deletedPlan) {
-            return res.status(404).json({ message: "Plan not found" });
+            return responseSender(res, 404, false, null, "Plan not found");
         }
 
-        return res.status(200).json({ message: "Plan deleted successfully" });
+        return responseSender(res, 200, true, null, "Plan deleted successfully");
     } catch (error) {
-        return res.status(500).json({ message: "Server error", error: error.message });
+        return responseSender(res, 500, false, { error: error.message }, "Server error");
     }
 };
 
@@ -94,17 +85,17 @@ export const softDeletePlan = async (req, res) => {
     try {
         const updatedPlan = await Plan.findByIdAndUpdate(
             req.params.id,
-            { status: 0 },  //  Sets status to 0 instead of deleting
-            { new: true }   //  Returns the updated document
+            { status: 0 },
+            { new: true }
         );
 
         if (!updatedPlan) {
-            return res.status(404).json({ message: "Plan not found" });
+            return responseSender(res, 404, false, null, "Plan not found");
         }
 
-        return res.status(200).json({ message: "Plan status updated to inactive (0)", plan: updatedPlan });
+        return responseSender(res, 200, true, { plan: updatedPlan }, "Plan status updated to inactive");
     } catch (error) {
-        return res.status(500).json({ message: "Server error", error: error.message });
+        return responseSender(res, 500, false, { error: error.message }, "Server error");
     }
 };
 
@@ -112,16 +103,16 @@ export const recoverPlan = async (req, res) => {
     try {
         const updatedPlan = await Plan.findByIdAndUpdate(
             req.params.id,
-            { status: 1 },  //  Reactivates the plan
+            { status: 1 },
             { new: true }
         );
 
         if (!updatedPlan) {
-            return res.status(404).json({ message: "Plan not found" });
+            return responseSender(res, 404, false, null, "Plan not found");
         }
 
-        return res.status(200).json({ message: "Plan recovered successfully", plan: updatedPlan });
+        return responseSender(res, 200, true, { plan: updatedPlan }, "Plan recovered successfully");
     } catch (error) {
-        return res.status(500).json({ message: "Server error", error: error.message });
+        return responseSender(res, 500, false, { error: error.message }, "Server error");
     }
 };

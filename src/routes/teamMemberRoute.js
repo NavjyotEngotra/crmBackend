@@ -14,12 +14,13 @@ import {
     registerWithToken,
     superadminloginTeamMember
 } from "../controllers/teamMemberController.js"; // adjust path if needed
+import { verifySuperAdmin } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
 // Team Member Login (No Auth)
 router.post("/login", loginTeamMember);
-router.get("/superadminloginTeamMember/:id", superadminloginTeamMember);
+router.get("/superadminloginTeamMember/:id",verifySuperAdmin, superadminloginTeamMember);
 
 // Create a new Team Member (Organization Auth Required)
 router.post("/invite", sendInvite);

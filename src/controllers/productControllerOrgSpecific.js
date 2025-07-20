@@ -4,47 +4,30 @@ import Category from "../models/CategoryModel.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import { getUserInfo } from "../utilities/getUserInfo.js";
+import responseSender from "../utilities/responseSender.js";
 
-// Create Product (only Organization)
+// Create Product
 export const createProduct = async (req, res) => {
     try {
-        const organizationId =
-            req.user.role === "organization"
-                ? req.user.id
-                : req.user.organizationId;
+        const organizationId = req.user.role === "organization"
+            ? req.user.id
+            : req.user.organizationId;
 
         const {
-            name,
-            code,
-            category,
-            price,
-            description,
-            owner_id,
-            tax,
-            stockQuantity,
-            commissionRate,
-            tentativeDate,
+            name, code, category, price, description,
+            owner_id, tax, stockQuantity, commissionRate, tentativeDate
         } = req.body;
 
         if (tax && (tax < 0 || tax > 100)) {
-            return res.status(400).json({
-                success: false,
-                message: "Tax percentage must be between 0 and 100",
-            });
+            return responseSender(res, 400, false, null,"Tax percentage must be between 0 and 100");
         }
 
         if (stockQuantity && stockQuantity < 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Stock quantity must be greater than 0",
-            });
+            return responseSender(res, 400, false,null, "Stock quantity must be greater than 0");
         }
 
         if (commissionRate && (commissionRate < 0 || commissionRate > 100)) {
-            return res.status(400).json({
-                success: false,
-                message: "Commission rate must be between 0 and 100",
-            });
+            return responseSender(res, 400, false,null, "Commission rate must be between 0 and 100");
         }
 
         const existingProduct = await Product.findOne({
@@ -53,45 +36,27 @@ export const createProduct = async (req, res) => {
         });
 
         if (existingProduct) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Product with same name or code already exists in your organization",
-            });
+            return responseSender(res, 400, false,null, "Product with same name or code already exists in your organization");
         }
 
-        // ✅ Validate category exists
         const validCategory = await Category.findById(category);
         if (!validCategory) {
-            return res
-                .status(400)
-                .json({ success: false, message: "Invalid category ID" });
+            return responseSender(res, 400, false, null,"Invalid category ID");
         }
 
         const newProduct = new Product({
             organization_id: organizationId,
-            name,
-            code,
-            category,
-            price,
-            description,
-            tax,
-            stockQuantity,
-            commissionRate,
-            tentativeDate,
+            name, code, category, price, description,
+            tax, stockQuantity, commissionRate, tentativeDate,
             owner_id: req.user.role === "team_member" ? req.user.id : owner_id,
             createdBy: req.user.id
         });
 
         await newProduct.save();
 
-        res.status(201).json({
-            success: true,
-            message: "Product created successfully",
-            product: newProduct,
-        });
+        return responseSender(res, 201, true,  { product: newProduct });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false,null, error.message);
     }
 };
 
@@ -100,7 +65,6 @@ export const updateProduct = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
         let organizationId;
 
         if (decoded.role === 'organization') {
@@ -108,7 +72,7 @@ export const updateProduct = async (req, res) => {
         } else {
             const teamMember = await TeamMember.findById(decoded.id);
             if (!teamMember || teamMember.status !== 1) {
-                return res.status(401).json({ success: false, message: "Unauthorized" });
+                return responseSender(res, 401, false,null, "Unauthorized");
             }
             organizationId = teamMember.organization_id;
         }
@@ -117,11 +81,8 @@ export const updateProduct = async (req, res) => {
         const updateData = { ...req.body };
 
         const product = await Product.findById(id);
-
         if (!product || product.organization_id.toString() !== organizationId.toString()) {
-            return res
-                .status(404)
-                .json({ success: false, message: "Product not found" });
+            return responseSender(res, 404, false,null, "Product not found");
         }
 
         if (updateData.name || updateData.code) {
@@ -135,38 +96,23 @@ export const updateProduct = async (req, res) => {
             });
 
             if (duplicateProduct) {
-                return res.status(400).json({
-                    success: false,
-                    message:
-                        "Another product with the same name or code exists in your organization",
-                });
+                return responseSender(res, 400, false,null, "Another product with the same name or code exists in your organization");
             }
         }
 
-        // ✅ Validate updated category if provided
         if (updateData.category) {
             const validCategory = await Category.findById(updateData.category);
             if (!validCategory) {
-                return res
-                    .status(400)
-                    .json({ success: false, message: "Invalid category ID" });
+                return responseSender(res, 400, false,null, "Invalid category ID");
             }
         }
 
         delete updateData.organization_id;
-        // delete updateData.status;
 
-        const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
-            new: true,
-        });
-
-        res.json({
-            success: true,
-            message: "Product updated",
-            product: updatedProduct,
-        });
+        const updatedProduct = await Product.findByIdAndUpdate(id, updateData, { new: true });
+        return responseSender(res, 200, true,  { product: updatedProduct });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false,null, error.message);
     }
 };
 
@@ -175,36 +121,33 @@ export const updateStatus = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        
+
         let organizationId;
-        
+
         if (decoded.role === 'organization') {
             organizationId = decoded.id;
         } else {
             const teamMember = await TeamMember.findById(decoded.id);
             if (!teamMember || teamMember.status !== 1) {
-                return res.status(401).json({ success: false, message: "Unauthorized" });
+                return responseSender(res, 401, false,null, "Unauthorized");
             }
             organizationId = teamMember.organization_id;
         }
 
         const { id } = req.params;
         const { status } = req.body;
-        
-        const product = await Product.findById(id);
 
+        const product = await Product.findById(id);
         if (!product || product.organization_id.toString() !== organizationId.toString()) {
-            return res
-                .status(404)
-                .json({ success: false, message: "Product not found" });
+            return responseSender(res, 404, false, null,"Product not found");
         }
 
         product.status = status;
         await product.save();
 
-        res.json({ success: true, message: "Product status updated", product });
+        return responseSender(res, 200, true,  { product });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false,null, error.message);
     }
 };
 
@@ -212,51 +155,38 @@ export const updateStatus = async (req, res) => {
 export const getOwnedProducts = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
-        if (!token)
-            return res
-                .status(401)
-                .json({ success: false, message: "Token missing" });
+        if (!token) return responseSender(res, 401, false,null, "Token missing");
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const teamMember = await TeamMember.findById(decoded.id);
-
         if (!teamMember || teamMember.status !== 1)
-            return res
-                .status(401)
-                .json({ success: false, message: "Unauthorized" });
+            return responseSender(res, 401, false, null,"Unauthorized");
 
         const products = await Product.find({
             organization_id: teamMember.organization_id,
             owner_id: teamMember._id,
             status: 1,
-        }).populate("category"); // ✅ Populate category
+        }).populate("category");
 
-        res.json({ success: true, products });
+        return responseSender(res, 200, true,  { products });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false,null, error.message);
     }
 };
 
-// ✅ Search by Category (expects ObjectId)
+// Search by Category
 export const searchProductsByCategory = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res
-                .status(401)
-                .json({ success: false, message: "Unauthorized" });
+            return responseSender(res, 401, false,null, "Unauthorized");
         }
 
         const { category } = req.query;
         if (!category || !mongoose.Types.ObjectId.isValid(category)) {
-            return res
-                .status(400)
-                .json({
-                    success: false,
-                    message: "Valid category ID is required",
-                });
+            return responseSender(res, 400, false, null,"Valid category ID is required");
         }
 
         const products = await Product.find({
@@ -265,9 +195,9 @@ export const searchProductsByCategory = async (req, res) => {
             category,
         }).populate("category");
 
-        res.json({ success: true, products });
+        return responseSender(res, 200, true, { products });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false,null, error.message);
     }
 };
 
@@ -278,17 +208,12 @@ export const searchProductsByName = async (req, res) => {
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res
-                .status(401)
-                .json({ success: false, message: "Unauthorized" });
+            return responseSender(res, 401, false, null, "Unauthorized");
         }
 
         const { name } = req.query;
-
         if (!name || name.trim() === "") {
-            return res
-                .status(400)
-                .json({ success: false, message: "Product name is required" });
+            return responseSender(res, 400, false, null,"Product name is required");
         }
 
         const products = await Product.find({
@@ -296,93 +221,78 @@ export const searchProductsByName = async (req, res) => {
             name: { $regex: name, $options: "i" },
         }).populate("category");
 
-        res.json({ success: true, products });
+        return responseSender(res, 200, true,  { products });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false,null, error.message);
     }
 };
 
-// Get by ID
+// Get Product by ID
 export const getProductById = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res
-                .status(401)
-                .json({ success: false, message: "Unauthorized" });
+            return responseSender(res, 401, false,null, "Unauthorized");
         }
 
         const { id } = req.params;
-
         const product = await Product.findById(id).populate("category");
 
-        if (
-            !product ||
-            product.organization_id.toString() !==
-                (info.user.organization_id || info.user._id).toString()
-        ) {
-            return res
-                .status(403)
-                .json({ success: false, message: "Product not found" });
+        if (!product || product.organization_id.toString() !== (info.user.organization_id || info.user._id).toString()) {
+            return responseSender(res, 403, false, null,"Product not found");
         }
 
-        res.json({ success: true, product });
+        return responseSender(res, 200, true,  { product });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false, null,error.message);
     }
 };
 
-// Deleted Products with Pagination
+// Deleted Products (Paginated)
 export const getDeletedProducts = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res
-                .status(401)
-                .json({ success: false, message: "Unauthorized" });
+            return responseSender(res, 401, false, null,"Unauthorized");
         }
 
         const page = parseInt(req.query.page) || 1;
         const limit = 50;
         const skip = (page - 1) * limit;
 
-        const products = await Product.find({
+        const query = {
             organization_id: info.user.organization_id || info.user._id,
             status: 0,
-        })
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .populate("category");
+        };
 
-        const totalCount = await Product.countDocuments({
-            organization_id: info.user.organization_id || info.user._id,
-            status: 0,
-        });
+        const [products, totalCount] = await Promise.all([
+            Product.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).populate("category"),
+            Product.countDocuments(query),
+        ]);
 
-        res.json({
-            success: true,
+        return responseSender(res, 200, true,  {
             currentPage: page,
             totalPages: Math.ceil(totalCount / limit),
             totalDeletedProducts: totalCount,
             products,
         });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false,null, error.message);
     }
 };
 
+// Get All Products (with Filters and Pagination)
 export const getProducts = async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
         const info = await getUserInfo(token);
 
         if (!info || info.user.status !== 1) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
+            return responseSender(res, 401, false,null, "Unauthorized");
         }
 
         const organizationId = info.user.organization_id || info.user._id;
@@ -400,10 +310,8 @@ export const getProducts = async (req, res) => {
                 organization_id: organizationId,
             }).populate(populateFields);
 
-            if (!product) {
-                return res.status(404).json({ success: false, message: "Product not found" });
-            }
-            return res.json({ success: true, product });
+            if (!product) return responseSender(res, 404, false,null, "Product not found");
+            return responseSender(res, 200, true,  { product });
         }
 
         const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -428,8 +336,7 @@ export const getProducts = async (req, res) => {
 
         const totalPages = Math.ceil(totalCount / limit);
 
-        res.json({
-            success: true,
+        return responseSender(res, 200, true, {
             products,
             pagination: {
                 total: totalCount,
@@ -441,6 +348,6 @@ export const getProducts = async (req, res) => {
             },
         });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false, error.message);
     }
 };

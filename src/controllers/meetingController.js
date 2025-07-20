@@ -1,6 +1,6 @@
-
 import Meeting from "../models/MeetingModel.js";
 import { getUserInfo } from "../utilities/getUserInfo.js";
+import  responseSender  from "../utilities/responseSender.js";
 
 export const createMeeting = async (req, res) => {
     try {
@@ -8,7 +8,7 @@ export const createMeeting = async (req, res) => {
         const info = await getUserInfo(token);
 
         if (!info) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
+            return responseSender(res, 401, false,null, "Unauthorized");
         }
 
         const { title, from, to, meeting_type, location, description } = req.body;
@@ -28,9 +28,9 @@ export const createMeeting = async (req, res) => {
         });
 
         await meeting.save();
-        res.status(201).json({ success: true, meeting });
+        return responseSender(res, 201, true,  { meeting });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false, null,error.message);
     }
 };
 
@@ -46,7 +46,7 @@ export const updateMeeting = async (req, res) => {
         });
 
         if (!meeting) {
-            return res.status(404).json({ success: false, message: "Meeting not found" });
+            return responseSender(res, 404, false, null,"Meeting not found");
         }
 
         const updateFields = { ...req.body };
@@ -63,9 +63,9 @@ export const updateMeeting = async (req, res) => {
             { new: true }
         );
 
-        res.json({ success: true, meeting: updatedMeeting });
+        return responseSender(res, 200, true,  { meeting: updatedMeeting });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false,null, error.message);
     }
 };
 
@@ -81,12 +81,12 @@ export const getMeetingById = async (req, res) => {
         });
 
         if (!meeting) {
-            return res.status(404).json({ success: false, message: "Meeting not found" });
+            return responseSender(res, 404, false,null, "Meeting not found");
         }
 
-        res.json({ success: true, meeting });
+        return responseSender(res, 200, true,  { meeting });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false,null, error.message);
     }
 };
 
@@ -103,41 +103,29 @@ export const getMeetings = async (req, res) => {
             organization_id: info.user.organization_id || info.user._id
         };
 
-        // Filter by status if provided
         if (req.query.status !== undefined) {
             query.status = parseInt(req.query.status);
         }
 
-        // Filter by date range if `from` and/or `to` are provided
         if (req.query.from || req.query.to) {
             query.from = {};
-
-            if (req.query.from) {
-                query.from.$gte = new Date(req.query.from);
-            }
-
-            if (req.query.to) {
-                query.from.$lte = new Date(req.query.to);
-            }
+            if (req.query.from) query.from.$gte = new Date(req.query.from);
+            if (req.query.to) query.from.$lte = new Date(req.query.to);
         }
 
         const [meetings, total] = await Promise.all([
-            Meeting.find(query)
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit),
+            Meeting.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
             Meeting.countDocuments(query)
         ]);
 
-        res.json({
-            success: true,
+        return responseSender(res, 200, true, {
             meetings,
             currentPage: page,
             totalPages: Math.ceil(total / limit),
             total
         });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false,null, error.message);
     }
 };
 
@@ -161,11 +149,11 @@ export const deleteMeeting = async (req, res) => {
         );
 
         if (!meeting) {
-            return res.status(404).json({ success: false, message: "Meeting not found" });
+            return responseSender(res, 404, false,null, "Meeting not found");
         }
 
-        res.json({ success: true, message: "Meeting deleted successfully" });
+        return responseSender(res, 200, true,null, "Meeting deleted successfully");
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return responseSender(res, 500, false,null,error.message);
     }
 };

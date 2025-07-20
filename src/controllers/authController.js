@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import TeamMember from "../models/TeamMemberModel.js";
+import responseSender from "../utilities/responseSender.js";
 
 /**
  * verifyTokenAPI
@@ -14,7 +15,7 @@ export const verifyTokenAPI = async (req, res) => {
 
     // Check if token is provided
     if (!token) {
-      return res.status(400).json({ message: "Token is required" });
+      return responseSender(res, 400, false, null, "Token is required");
     }
 
     // Verify the token using your JWT_SECRET
@@ -23,30 +24,29 @@ export const verifyTokenAPI = async (req, res) => {
     // Check role from the token
     if (decoded.role === "organization") {
       // Organization is validated
-      return res.status(200).json({
-        valid: true,
+      return responseSender(res, 200, true, {
         role: "organization",
         id: decoded.id,
-      });
-    } else {
-      // Team member verification: check if team member exists and is active
-      const teamMember = await TeamMember.findById(decoded.id);
-
-      if (!teamMember || teamMember.status !== 1) {
-        return res.status(401).json({ message: "Unauthorized team member" });
-      }
-
-      // Team member is validated
-      return res.status(200).json({
-        valid: true,
-        role: "team_member",
-        id: decoded.id,
-        organizationId: teamMember.organization_id,
-      });
+      }, "Token verified successfully");
     }
+
+    // Team member verification: check if team member exists and is active
+    const teamMember = await TeamMember.findById(decoded.id);
+
+    if (!teamMember || teamMember.status !== 1) {
+      return responseSender(res, 401, false, null, "Unauthorized team member");
+    }
+
+    // Team member is validated
+    return responseSender(res, 200, true, {
+      role: "team_member",
+      id: decoded.id,
+      organizationId: teamMember.organization_id,
+    }, "Token verified successfully");
+
   } catch (error) {
     console.error("verifyTokenAPI error:", error);
     // Return consistent unauthorized response on error
-    return res.status(401).json({ message: "Invalid token" });
+    return responseSender(res, 401, false, null, "Invalid token");
   }
 };
