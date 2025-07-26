@@ -27,6 +27,7 @@ import leadRoutes from "./routes/leadRoutes.js";
 import authRoute from "./routes/authRoutes.js";
 import permissionRoute from "./routes/permissionRoutes.js"
 import teamMemberPermissionRoute from "./routes/teamMemberPermissionRoutes.js"
+import staticDataRouter from "./routes/staticDataRoutes.js"
 
 // Import models to ensure they are registered
 import "./models/index.js";
@@ -92,6 +93,7 @@ app.use("/api/lead", leadRoutes);
 app.use("/api/auth",authRoute);
 app.use("/api/permission",permissionRoute)
 app.use("/api/assignPermission",teamMemberPermissionRoute)
+app.use("/api/staticDataRouter",staticDataRouter)
 
 
 ;(async()=>{
