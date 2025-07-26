@@ -290,24 +290,55 @@ export const commonLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        let user = await Organization.findOne({ email });
+        // First check in Organization
+        let user = await Organization.findOne({ email, status: 1 }).select("+password");
+        let token = null;
         let role = "organization";
 
+        if (user) {
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) {
+                return responseSender(res, 401, false, null, "Invalid credentials");
+            }
+
+            token = generateOrganizationToken(user._id);
+            const userData = user.toObject();
+            delete userData.password;
+
+            return responseSender(res, 200, true, {
+                token,
+                role,
+                organization: userData,
+                permissions: MODULE_PERMISSIONS,
+            }, "Login successful");
+        }
+
+        // If not found in Organization, check in TeamMember
+        user = await TeamMember.findOne({ email, status: 1 }).select("+password");
+        role = "teamMember";
+
         if (!user) {
-            user = await TeamMember.findOne({ email });
-            role = "teammember";
+            return responseSender(res, 404, false, null, "User not found or inactive");
         }
 
-        if (!user || !(await bcrypt.compare(password, user.password))) {
-            return responseSender(res, 401, false, {}, "Invalid credentials");
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return responseSender(res, 401, false, null, "Invalid credentials");
         }
 
-        const token = generateToken(user._id, role);
-        const info = await getUserInfo(user._id, role);
+        token = generateToken(user._id);
+        const userData = user.toObject();
+        delete userData.password;
 
-        return responseSender(res, 200, true, { token, ...info }, "Login successful");
+        return responseSender(res, 200, true, {
+            token,
+            role,
+            teamMember: userData,
+            permissions: MODULE_PERMISSIONS,
+        }, "Login successful");
+
     } catch (error) {
-        return responseSender(res, 500, false, {}, error.message);
+        return responseSender(res, 500, false, null, error.message);
     }
 };
 
