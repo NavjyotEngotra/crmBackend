@@ -16,6 +16,7 @@ router.get("/modules", (req, res) => {
     "pipeline",
     "product",
     "stage",
+    "task",
   ], "Modules fetched successfully");
 });
 
