@@ -1,3 +1,4 @@
+import Meeting from "../models/MeetingModel.js";
 import Task from "../models/TaskModel.js";
 import { getUserInfo } from "../utilities/getUserInfo.js";
 import responseSender from "../utilities/responseSender.js";
@@ -140,6 +141,58 @@ export const deleteTask = async (req, res) => {
     if (!task) return responseSender(res, 404, false, null, "Task not found");
 
     return responseSender(res, 200, true, null, "Task deleted successfully");
+  } catch (error) {
+    return responseSender(res, 500, false, null, error.message);
+  }
+};
+
+
+export const getMeetingsAndTasks = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    const info = await getUserInfo(token);
+
+    if (!info) return responseSender(res, 401, false, null, "Unauthorized");
+
+    const orgId = info.user.organization_id || info.user._id;
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const skip = (page - 1) * limit;
+
+    // Separate filters
+    const meetingQuery = { organization_id: orgId };
+    const taskQuery = { organization_id: orgId };
+
+    if (req.query.statusCode !== undefined) {
+      const status = parseInt(req.query.statusCode);
+      meetingQuery.status = status;         // Correct field for Meeting
+      taskQuery.statusCode = status;        // Correct field for Task
+    } else {
+      meetingQuery.status = { $in: [0, 1] };
+      taskQuery.statusCode = { $in: [0, 1] };
+    }
+
+    // Fetch separately
+    const [meetings, meetingTotal] = await Promise.all([
+      Meeting.find(meetingQuery).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Meeting.countDocuments(meetingQuery),
+    ]);
+
+    const [tasks, taskTotal] = await Promise.all([
+      Task.find(taskQuery).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Task.countDocuments(taskQuery),
+    ]);
+
+    return responseSender(res, 200, true, {
+      meetings,
+      tasks,
+      currentPage: page,
+      totalMeetingPages: Math.ceil(meetingTotal / limit),
+      totalTaskPages: Math.ceil(taskTotal / limit),
+      totalMeetings: meetingTotal,
+      totalTasks: taskTotal,
+    });
   } catch (error) {
     return responseSender(res, 500, false, null, error.message);
   }
