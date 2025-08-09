@@ -13,17 +13,17 @@ export const createPermission = async (req, res) => {
         (p) => !p.name || !/^[a-zA-Z0-9]+\.(create|update|read|delete)$/.test(p.name)
       );
       if (invalid) {
-        return responseSender(res, false, 400, "Each permission must have a valid name");
+        return responseSender(res, false, 400,null, "Each permission must have a valid name");
       }
 
       const names = payload.map((p) => p.name);
       const existing = await Permission.find({ name: { $in: names } });
       if (existing.length > 0) {
-        return responseSender(res, false, 409, "Some permissions already exist", { existing });
+        return responseSender(res, false, 409, {existing}, "Some permissions already exist");
       }
 
       const created = await Permission.insertMany(payload);
-      return responseSender(res, true, 201, "Permissions created", { permissions: created });
+      return responseSender(res, true, 201,  { permissions: created });
     }
 
     const { name, description } = payload;
@@ -34,16 +34,16 @@ export const createPermission = async (req, res) => {
 
     const existing = await Permission.findOne({ name });
     if (existing) {
-      return responseSender(res, false, 409, "Permission already exists");
+      return responseSender(res, false, 409,null, "Permission already exists");
     }
 
     const permission = new Permission({ name, description });
     await permission.save();
 
-    return responseSender(res, true, 201, "Permission created", { permission });
+    return responseSender(res, true, 201,  { permission });
   } catch (error) {
     console.error("createPermission error:", error);
-    return responseSender(res, false, 500, "Server error");
+    return responseSender(res, false, 500,null, "Server error");
   }
 };
 
@@ -53,10 +53,10 @@ export const createPermission = async (req, res) => {
 export const getAllPermissions = async (req, res) => {
   try {
     const permissions = await Permission.find();
-    return responseSender(res, true, 200, "Permissions fetched", { permissions });
+    return responseSender(res, true, 200,  { permissions });
   } catch (error) {
     console.error("getAllPermissions error:", error);
-    return responseSender(res, false, 500, "Server error");
+    return responseSender(res, false, 500, null,"Server error");
   }
 };
 
@@ -69,13 +69,13 @@ export const getPermissionById = async (req, res) => {
     const permission = await Permission.findById(id);
 
     if (!permission) {
-      return responseSender(res, false, 404, "Permission not found");
+      return responseSender(res, false, 404, null,"Permission not found");
     }
 
-    return responseSender(res, true, 200, "Permission fetched", { permission });
+    return responseSender(res, true, 200, { permission });
   } catch (error) {
     console.error("getPermissionById error:", error);
-    return responseSender(res, false, 500, "Server error");
+    return responseSender(res, false, 500,null, "Server error");
   }
 };
 
@@ -94,13 +94,13 @@ export const updatePermission = async (req, res) => {
     );
 
     if (!permission) {
-      return responseSender(res, false, 404, "Permission not found");
+      return responseSender(res, false, 404,null, "Permission not found");
     }
 
-    return responseSender(res, true, 200, "Permission updated", { permission });
+    return responseSender(res, true, 200,  { permission });
   } catch (error) {
     console.error("updatePermission error:", error);
-    return responseSender(res, false, 500, "Server error");
+    return responseSender(res, false, 500,null, "Server error");
   }
 };
 
@@ -113,12 +113,12 @@ export const deletePermission = async (req, res) => {
     const permission = await Permission.findByIdAndDelete(id);
 
     if (!permission) {
-      return responseSender(res, false, 404, "Permission not found");
+      return responseSender(res, false, 404,null, "Permission not found");
     }
 
-    return responseSender(res, true, 200, "Permission deleted");
+    return responseSender(res, true, 200,null, "Permission deleted");
   } catch (error) {
     console.error("deletePermission error:", error);
-    return responseSender(res, false, 500, "Server error");
+    return responseSender(res, false, 500,null, "Server error");
   }
 };

@@ -11,7 +11,7 @@ export const createNote = async (req, res) => {
     const teamMember = await TeamMember.findById(decoded.id);
 
     if (!teamMember || teamMember.status !== 1) {
-      return responseSender(res, 401, false, "Unauthorized");
+      return responseSender(res, 401, false,null, "Unauthorized");
     }
 
     const { title, description, module_id } = req.body;
@@ -26,9 +26,9 @@ export const createNote = async (req, res) => {
     });
 
     await note.save();
-    return responseSender(res, 201, true, "Note created", { note });
+    return responseSender(res, 201, true,  { note });
   } catch (err) {
-    return responseSender(res, 500, false, err.message);
+    return responseSender(res, 500, false,null, err.message);
   }
 };
 
@@ -40,7 +40,7 @@ export const getNotesByModuleId = async (req, res) => {
     const teamMember = await TeamMember.findById(decoded.id);
 
     if (!teamMember || teamMember.status !== 1) {
-      return responseSender(res, 401, false, "Unauthorized");
+      return responseSender(res, 401, false,null, "Unauthorized");
     }
 
     const { module_id } = req.params;
@@ -60,12 +60,12 @@ export const getNotesByModuleId = async (req, res) => {
     const hasNextPage = notes.length > limit;
     const paginatedNotes = hasNextPage ? notes.slice(0, limit) : notes;
 
-    return responseSender(res, 200, true, "Notes fetched", {
+    return responseSender(res, 200, true,  {
       notes: paginatedNotes,
       pagination: { hasNextPage },
     });
   } catch (err) {
-    return responseSender(res, 500, false, err.message);
+    return responseSender(res, 500, false,null, err.message);
   }
 };
 
@@ -80,7 +80,7 @@ export const updateNote = async (req, res) => {
     const note = await Note.findById(id);
 
     if (!note || note.organization_id.toString() !== teamMember.organization_id.toString()) {
-      return responseSender(res, 404, false, "Note not found");
+      return responseSender(res, 404, false,null, "Note not found");
     }
 
     const updateData = { ...req.body };
@@ -90,9 +90,9 @@ export const updateNote = async (req, res) => {
     updateData.editedBy = teamMember._id;
 
     const updatedNote = await Note.findByIdAndUpdate(id, updateData, { new: true });
-    return responseSender(res, 200, true, "Note updated", { note: updatedNote });
+    return responseSender(res, 200, true, { note: updatedNote });
   } catch (err) {
-    return responseSender(res, 500, false, err.message);
+    return responseSender(res, 500, false,null, err.message);
   }
 };
 
@@ -107,7 +107,7 @@ export const updateStatus = async (req, res) => {
     const note = await Note.findById(id);
 
     if (!note || note.organization_id.toString() !== teamMember.organization_id.toString()) {
-      return responseSender(res, 404, false, "Note not found");
+      return responseSender(res, 404, false,null, "Note not found");
     }
 
     const { status } = req.body;
@@ -115,8 +115,8 @@ export const updateStatus = async (req, res) => {
     note.editedBy = teamMember._id;
     await note.save();
 
-    return responseSender(res, 200, true, "Note status updated", { note });
+    return responseSender(res, 200, true,  { note });
   } catch (err) {
-    return responseSender(res, 500, false, err.message);
+    return responseSender(res, 500, false,null, err.message);
   }
 };

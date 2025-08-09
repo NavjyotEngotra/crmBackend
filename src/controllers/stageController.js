@@ -15,23 +15,23 @@ export const createStage = async (req, res) => {
 
     const pipeline = await Pipeline.findOne({ _id: pipeline_id, organization_id, status: 1 });
     if (!pipeline)
-      return responseSender(res, 404, false, "Pipeline not found or access denied");
+      return responseSender(res, 404, false,null, "Pipeline not found or access denied");
 
     if (type === "teamMember" && !pipeline.users_has_access.includes(user._id))
-      return responseSender(res, 403, false, "You don't have access to this pipeline");
+      return responseSender(res, 403, false, null,"You don't have access to this pipeline");
 
     const existingStage = await Stage.findOne({ name, pipeline_id, status: 1 });
     if (existingStage)
-      return responseSender(res, 400, false, "A stage with this name already exists in this pipeline");
+      return responseSender(res, 400, false,null, "A stage with this name already exists in this pipeline");
 
     const stage = new Stage({ name, serialNumber, stageType, pipeline_id, organization_id, created_by: user._id });
     await stage.save();
 
-    return responseSender(res, 201, true, "Stage created successfully", { stage });
+    return responseSender(res, 201, true, { stage });
   } catch (error) {
     if (error.code === 11000)
-      return responseSender(res, 400, false, "A stage with this name or serial number already exists in this pipeline");
-    return responseSender(res, 500, false, error.message);
+      return responseSender(res, 400, false,null, "A stage with this name or serial number already exists in this pipeline");
+    return responseSender(res, 500, false,null, error.message);
   }
 };
 
@@ -47,7 +47,7 @@ export const getStages = async (req, res) => {
 
       if (type === "teamMember") {
         const pipeline = await Pipeline.findOne({ _id: pipeline_id, organization_id: user.organization_id, users_has_access: user._id, status: 1 });
-        if (!pipeline) return responseSender(res, 403, false, "You don't have access to this pipeline");
+        if (!pipeline) return responseSender(res, 403, false,null, "You don't have access to this pipeline");
       }
     }
 
@@ -60,13 +60,13 @@ export const getStages = async (req, res) => {
       .populate("pipeline_id", "name")
       .sort({ serialNumber: 1 });
 
-    return responseSender(res, 200, true, "Stages fetched successfully", {
+    return responseSender(res, 200, true,  {
       stages,
       total: stages.length,
       filters: { pipeline_id, status: status ? parseInt(status) : undefined, searchByName: searchByName?.trim() }
     });
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false,null, error.message);
   }
 };
 
@@ -82,7 +82,7 @@ export const getStageById = async (req, res) => {
       .populate("updated_by", "name email")
       .populate("pipeline_id", "name");
 
-    if (!stage) return responseSender(res, 404, false, "Stage not found or access denied");
+    if (!stage) return responseSender(res, 404, false,null, "Stage not found or access denied");
 
     if (type === "teamMember") {
       const pipeline = await Pipeline.findOne({
@@ -93,12 +93,12 @@ export const getStageById = async (req, res) => {
       });
 
       if (!pipeline)
-        return responseSender(res, 403, false, "You don't have access to this stage's pipeline");
+        return responseSender(res, 403, false, null,"You don't have access to this stage's pipeline");
     }
 
-    return responseSender(res, 200, true, "Stage fetched successfully", { stage });
+    return responseSender(res, 200, true, { stage });
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false, null,error.message);
   }
 };
 
@@ -111,7 +111,7 @@ export const updateStage = async (req, res) => {
 
     let query = { _id: id, organization_id: type === "organization" ? user._id : user.organization_id };
     const stage = await Stage.findOne(query);
-    if (!stage) return responseSender(res, 404, false, "Stage not found or access denied");
+    if (!stage) return responseSender(res, 404, false,null,"Stage not found or access denied");
 
     if (type === "teamMember") {
       const pipeline = await Pipeline.findOne({
@@ -122,7 +122,7 @@ export const updateStage = async (req, res) => {
       });
 
       if (!pipeline)
-        return responseSender(res, 403, false, "You don't have access to this stage's pipeline");
+        return responseSender(res, 403, false, null,"You don't have access to this stage's pipeline");
     }
 
     if (name && name !== stage.name) {
@@ -134,7 +134,7 @@ export const updateStage = async (req, res) => {
       });
 
       if (existingStage)
-        return responseSender(res, 400, false, "A stage with this name already exists in this pipeline");
+        return responseSender(res, 400, false,null, "A stage with this name already exists in this pipeline");
     }
 
     if (name) stage.name = name;
@@ -144,11 +144,11 @@ export const updateStage = async (req, res) => {
     stage.updated_by = user._id;
 
     await stage.save();
-    return responseSender(res, 200, true, "Stage updated successfully", { stage });
+    return responseSender(res, 200, true, { stage });
   } catch (error) {
     if (error.code === 11000)
-      return responseSender(res, 400, false, "Duplicate stage name or serial number");
-    return responseSender(res, 500, false, error.message);
+      return responseSender(res, 400, false,null, "Duplicate stage name or serial number");
+    return responseSender(res, 500, false,null, error.message);
   }
 };
 
@@ -159,7 +159,7 @@ export const createStages = async (req, res) => {
     const { type, user } = req.user;
 
     if (!Array.isArray(stages) || stages.length === 0)
-      return responseSender(res, 400, false, "Please provide an array of stages");
+      return responseSender(res, 400, false,null, "Please provide an array of stages");
 
     let organization_id = type === "organization" ? user._id : user.organization_id;
 
@@ -168,12 +168,12 @@ export const createStages = async (req, res) => {
     const pipelines = await Pipeline.find({ _id: { $in: pipelineIds }, organization_id, status: 1 });
 
     if (pipelines.length !== pipelineIds.length)
-      return responseSender(res, 404, false, "One or more pipelines not found or access denied");
+      return responseSender(res, 404, false,null, "One or more pipelines not found or access denied");
 
     if (type === "teamMember") {
       const hasAccess = pipelines.every(p => p.users_has_access.includes(user._id));
       if (!hasAccess)
-        return responseSender(res, 403, false, "You don't have access to one or more pipelines");
+        return responseSender(res, 403, false,null, "You don't have access to one or more pipelines");
     }
 
     for (const pid of pipelineIds) {
@@ -181,7 +181,7 @@ export const createStages = async (req, res) => {
       const duplicates = await Stage.find({ pipeline_id: pid, name: { $in: names }, status: 1 });
 
       if (duplicates.length)
-        return responseSender(res, 400, false, `Duplicate names found in pipeline ${pid}`);
+        return responseSender(res, 400, false, null,`Duplicate names found in pipeline ${pid}`);
     }
 
     const stageDocs = stages.map(s => ({
@@ -191,9 +191,9 @@ export const createStages = async (req, res) => {
     }));
 
     const createdStages = await Stage.insertMany(stageDocs);
-    return responseSender(res, 201, true, "Stages created successfully", { stages: createdStages });
+    return responseSender(res, 201, true,{ stages: createdStages });
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false,null, error.message);
   }
 };
 
@@ -204,14 +204,14 @@ export const updateStages = async (req, res) => {
     const { type, user } = req.user;
 
     if (!Array.isArray(stages) || stages.length === 0)
-      return responseSender(res, 400, false, "Please provide an array of stages");
+      return responseSender(res, 400, false,null, "Please provide an array of stages");
 
     const organization_id = type === "organization" ? user._id : user.organization_id;
     const updateIds = stages.filter(s => s._id).map(s => s._id);
     const updateStages = await Stage.find({ _id: { $in: updateIds }, organization_id });
 
     if (updateStages.length !== updateIds.length)
-      return responseSender(res, 404, false, "One or more stages not found or access denied");
+      return responseSender(res, 404, false,null, "One or more stages not found or access denied");
 
     const newStages = stages.filter(s => !s._id);
     const allPipelineIds = [...new Set([...updateStages.map(s => s.pipeline_id.toString()), ...newStages.map(s => s.pipeline_id)])];
@@ -221,7 +221,7 @@ export const updateStages = async (req, res) => {
     if (type === "teamMember") {
       const hasAccess = pipelines.every(p => p.users_has_access.includes(user._id));
       if (!hasAccess)
-        return responseSender(res, 403, false, "Access denied to one or more pipelines");
+        return responseSender(res, 403, false, null,"Access denied to one or more pipelines");
     }
 
     const updated = await Promise.all(updateStages.map(async s => {
@@ -242,9 +242,9 @@ export const updateStages = async (req, res) => {
       status: s.status ?? 1
     })));
 
-    return responseSender(res, 200, true, "Stages updated and created successfully", { stages: [...updated, ...created] });
+    return responseSender(res, 200, true,  { stages: [...updated, ...created] });
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false,null, error.message);
   }
 };
 
@@ -254,7 +254,7 @@ export const swapSerialNumbers = async (req, res) => {
     const { pipeline_id, swaps } = req.body;
     const token = req.headers.authorization?.split(" ")[1];
     if (!pipeline_id || !Array.isArray(swaps) || swaps.length === 0)
-      return responseSender(res, 400, false, "pipeline_id and swaps array required");
+      return responseSender(res, 400, false,null, "pipeline_id and swaps array required");
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     let organization_id;
@@ -263,24 +263,24 @@ export const swapSerialNumbers = async (req, res) => {
     if (teamMember) organization_id = teamMember.organization_id;
     else {
       const org = await Organization.findById(decoded.id);
-      if (!org) return responseSender(res, 401, false, "Unauthorized");
+      if (!org) return responseSender(res, 401, false,null, "Unauthorized");
       organization_id = org._id;
     }
 
     const pipeline = await Pipeline.findOne({ _id: pipeline_id, organization_id });
-    if (!pipeline) return responseSender(res, 403, false, "Pipeline not found");
+    if (!pipeline) return responseSender(res, 403, false,null, "Pipeline not found");
 
     const stageIds = swaps.map(s => s.stage_id);
     const stages = await Stage.find({ _id: { $in: stageIds }, pipeline_id, organization_id });
     if (stages.length !== swaps.length)
-      return responseSender(res, 404, false, "Some stages not found or unauthorized");
+      return responseSender(res, 404, false,null, "Some stages not found or unauthorized");
 
     const serials = swaps.map(s => s.serial_number ?? s.serialNumber);
     if (new Set(serials).size !== serials.length)
-      return responseSender(res, 400, false, "Duplicate serial numbers");
+      return responseSender(res, 400, false,null, "Duplicate serial numbers");
 
     if (!serials.every(n => Number.isInteger(n) && n > 0))
-      return responseSender(res, 400, false, "Serial numbers must be positive integers");
+      return responseSender(res, 400, false, null,"Serial numbers must be positive integers");
 
     await Stage.bulkWrite(swaps.map(({ stage_id }) => ({
       updateOne: { filter: { _id: stage_id }, update: { $inc: { serialNumber: 1000 } } },
@@ -290,8 +290,8 @@ export const swapSerialNumbers = async (req, res) => {
       updateOne: { filter: { _id: stage_id }, update: { serialNumber: serial_number ?? serialNumber } },
     })));
 
-    return responseSender(res, 200, true, "Serial numbers updated successfully");
+    return responseSender(res, 200, true,null, "Serial numbers updated successfully");
   } catch (err) {
-    return responseSender(res, 500, false, "Failed to update stages", { error: err.message });
+    return responseSender(res, 500, false,null, "Failed to update stages", { error: err.message });
   }
 };

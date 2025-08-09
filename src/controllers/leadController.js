@@ -27,7 +27,7 @@ export const createLead = async (req, res) => {
     const info = await getUserInfo(token);
 
     if (!info || info.user.status !== 1) {
-      return responseSender(res, 401, false, "Unauthorized");
+      return responseSender(res, 401, false,null, "Unauthorized");
     }
 
     const organizationId = info.user.organization_id || info.user._id;
@@ -43,9 +43,9 @@ export const createLead = async (req, res) => {
 
     await lead.save();
     const populatedLead = await populateLeadFields(Lead.findById(lead._id));
-    return responseSender(res, 201, true, "Lead created successfully", { lead: populatedLead });
+    return responseSender(res, 201, true,  { lead: populatedLead });
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false, null,error.message);
   }
 };
 
@@ -56,7 +56,7 @@ export const getLeads = async (req, res) => {
     const info = await getUserInfo(token);
 
     if (!info || info.user.status !== 1) {
-      return responseSender(res, 401, false, "Unauthorized");
+      return responseSender(res, 401, false,null, "Unauthorized");
     }
 
     const organizationId = info.user.organization_id || info.user._id;
@@ -78,7 +78,7 @@ export const getLeads = async (req, res) => {
     ]);
 
     const totalPages = Math.ceil(totalCount / limit);
-    return responseSender(res, 200, true, "Leads fetched", {
+    return responseSender(res, 200, true,  {
       leads,
       pagination: {
         total: totalCount,
@@ -90,7 +90,7 @@ export const getLeads = async (req, res) => {
       }
     });
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false,null, error.message);
   }
 };
 
@@ -101,19 +101,19 @@ export const getLeadById = async (req, res) => {
     const info = await getUserInfo(token);
 
     if (!info || info.user.status !== 1) {
-      return responseSender(res, 401, false, "Unauthorized");
+      return responseSender(res, 401, false, null,"Unauthorized");
     }
 
     const organizationId = info.user.organization_id || info.user._id;
     const lead = await populateLeadFields(Lead.findOne({ _id: req.params.id, organization_id: organizationId }));
 
     if (!lead) {
-      return responseSender(res, 404, false, "Lead not found");
+      return responseSender(res, 404, false,null, "Lead not found");
     }
 
-    return responseSender(res, 200, true, "Lead fetched", { lead });
+    return responseSender(res, 200, true,  { lead });
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false, null,error.message);
   }
 };
 
@@ -124,14 +124,14 @@ export const updateLead = async (req, res) => {
     const info = await getUserInfo(token);
 
     if (!info || info.user.status !== 1) {
-      return responseSender(res, 401, false, "Unauthorized");
+      return responseSender(res, 401, false,null, "Unauthorized");
     }
 
     const organizationId = info.user.organization_id || info.user._id;
     const lead = await Lead.findOne({ _id: req.params.id, organization_id: organizationId });
 
     if (!lead) {
-      return responseSender(res, 404, false, "Lead not found");
+      return responseSender(res, 404, false,null, "Lead not found");
     }
 
     const updatedLead = await populateLeadFields(
@@ -146,9 +146,9 @@ export const updateLead = async (req, res) => {
       )
     );
 
-    return responseSender(res, 200, true, "Lead updated successfully", { lead: updatedLead });
+    return responseSender(res, 200, true,  { lead: updatedLead });
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false,null, error.message);
   }
 };
 
@@ -159,14 +159,14 @@ export const updateStatus = async (req, res) => {
     const info = await getUserInfo(token);
 
     if (!info || info.user.status !== 1) {
-      return responseSender(res, 401, false, "Unauthorized");
+      return responseSender(res, 401, false,null, "Unauthorized");
     }
 
     const organizationId = info.user.organization_id || info.user._id;
     const lead = await Lead.findOne({ _id: req.params.id, organization_id: organizationId });
 
     if (!lead) {
-      return responseSender(res, 404, false, "Lead not found");
+      return responseSender(res, 404, false,null, "Lead not found");
     }
 
     lead.status = req.body.status;
@@ -175,9 +175,9 @@ export const updateStatus = async (req, res) => {
     await lead.save();
 
     const populatedLead = await populateLeadFields(Lead.findById(lead._id));
-    return responseSender(res, 200, true, "Lead status updated", { lead: populatedLead });
+    return responseSender(res, 200, true,  { lead: populatedLead });
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false,null, error.message);
   }
 };
 
@@ -188,15 +188,15 @@ export const getDeletedLeads = async (req, res) => {
     const info = await getUserInfo(token);
 
     if (!info || info.user.status !== 1) {
-      return responseSender(res, 401, false, "Unauthorized");
+      return responseSender(res, 401, false,null, "Unauthorized");
     }
 
     const organizationId = info.user.organization_id || info.user._id;
     const leads = await populateLeadFields(Lead.find({ organization_id: organizationId, status: 0 }));
 
-    return responseSender(res, 200, true, "Deleted leads fetched", { leads });
+    return responseSender(res, 200, true,  { leads });
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false,null, error.message);
   }
 };
 
@@ -207,7 +207,7 @@ export const searchLeadsByName = async (req, res) => {
     const info = await getUserInfo(token);
 
     if (!info || info.user.status !== 1) {
-      return responseSender(res, 401, false, "Unauthorized");
+      return responseSender(res, 401, false,null, "Unauthorized");
     }
 
     const organizationId = info.user.organization_id || info.user._id;
@@ -219,9 +219,9 @@ export const searchLeadsByName = async (req, res) => {
       })
     );
 
-    return responseSender(res, 200, true, "Leads fetched", { leads });
+    return responseSender(res, 200, true, { leads });
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false, null,error.message);
   }
 };
 
@@ -236,11 +236,11 @@ export const deleteLeadPermanently = async (req, res) => {
     const deletedLead = await Lead.findOneAndDelete({ _id: id, organization_id: organizationId });
 
     if (!deletedLead) {
-      return responseSender(res, 404, false, "Lead not found or does not belong to your organization");
+      return responseSender(res, 404, false, null,"Lead not found or does not belong to your organization");
     }
 
-    return responseSender(res, 200, true, "Lead permanently deleted");
+    return responseSender(res, 200, true, null,"Lead permanently deleted");
   } catch (error) {
-    return responseSender(res, 500, false, "Server error: " + error.message);
+    return responseSender(res, 500, false, null,"Server error: " + error.message);
   }
 };

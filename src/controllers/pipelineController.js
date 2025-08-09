@@ -18,7 +18,7 @@ export const createPipeline = async (req, res) => {
     });
 
     if (existingPipeline) {
-      return responseSender(res, 400, false, "A pipeline with this name already exists in your organization");
+      return responseSender(res, 400, false,null,"A pipeline with this name already exists in your organization");
     }
 
     const pipeline = new Pipeline({
@@ -31,13 +31,13 @@ export const createPipeline = async (req, res) => {
 
     await pipeline.save();
 
-    return responseSender(res, 201, true, "Pipeline created successfully", { pipeline });
+    return responseSender(res, 201, true, { pipeline });
 
   } catch (error) {
     if (error.code === 11000) {
-      return responseSender(res, 400, false, "A pipeline with this name already exists in your organization");
+      return responseSender(res, 400, false,null, "A pipeline with this name already exists in your organization");
     }
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false,null, error.message);
   }
 };
 
@@ -69,7 +69,7 @@ export const getPipelines = async (req, res) => {
       .populate('users_has_access', 'name email')
       .sort({ createdAt: -1 });
 
-    return responseSender(res, 200, true, "Pipelines fetched successfully", {
+    return responseSender(res, 200, true, {
       pipelines,
       total: pipelines.length,
       filters: {
@@ -78,7 +78,7 @@ export const getPipelines = async (req, res) => {
       }
     });
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false,null, error.message);
   }
 };
 
@@ -99,7 +99,7 @@ export const updatePipeline = async (req, res) => {
 
     const pipeline = await Pipeline.findOne(query);
     if (!pipeline) {
-      return responseSender(res, 404, false, "Pipeline not found or access denied");
+      return responseSender(res, 404, false,null, "Pipeline not found or access denied");
     }
 
     if (name && name !== pipeline.name) {
@@ -110,7 +110,7 @@ export const updatePipeline = async (req, res) => {
         _id: { $ne: id }
       });
       if (existingPipeline) {
-        return responseSender(res, 400, false, "A pipeline with this name already exists in your organization");
+        return responseSender(res, 400, false,null, "A pipeline with this name already exists in your organization");
       }
     }
 
@@ -122,13 +122,13 @@ export const updatePipeline = async (req, res) => {
 
     await pipeline.save();
 
-    return responseSender(res, 200, true, "Pipeline updated successfully", { pipeline });
+    return responseSender(res, 200, true,  { pipeline });
 
   } catch (error) {
     if (error.code === 11000) {
-      return responseSender(res, 400, false, "A pipeline with this name already exists in your organization");
+      return responseSender(res, 400, false,null, "A pipeline with this name already exists in your organization");
     }
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false,null, error.message);
   }
 };
 
@@ -152,7 +152,7 @@ export const getPipelineById = async (req, res) => {
       .populate('users_has_access', 'name email');
 
     if (!pipeline) {
-      return responseSender(res, 404, false, "Pipeline not found or access denied");
+      return responseSender(res, 404, false,null, "Pipeline not found or access denied");
     }
 
     const stages = await Stage.find({
@@ -184,12 +184,12 @@ export const getPipelineById = async (req, res) => {
       })
     );
 
-    return responseSender(res, 200, true, "Pipeline fetched successfully", {
+    return responseSender(res, 200, true, {
       pipeline,
       stages: stagesWithLeads
     });
 
   } catch (error) {
-    return responseSender(res, 500, false, error.message);
+    return responseSender(res, 500, false,null, error.message);
   }
 };
