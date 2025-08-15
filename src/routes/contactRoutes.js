@@ -7,7 +7,8 @@ import {
     updateStatus,
     searchContactsByName,
     getContactById,
-    getOwnedContacts
+    getOwnedContacts,
+    getContactsCreatedLast28Days
 } from "../controllers/contactController.js";
 import { isAdmin } from "../middlewares/authMiddleware.js";
 import { checkPermission } from "../middlewares/checkPermission.js";
@@ -17,6 +18,7 @@ const router = express.Router();
 router.post("/",checkPermission("contact.create"), createContact);
 router.put("/:id",checkPermission("contact.update"), updateContact);
 router.get("/",checkPermission("contact.read"), getContacts);
+router.get("/getLast28days",checkPermission("contact.read"), getContactsCreatedLast28Days);
 router.get("/deleted",checkPermission("contact.read"), getDeletedContacts);
 router.put("/update-status/:id",checkPermission("contact.update"),isAdmin, updateStatus);
 router.get("/search",checkPermission("contact.read"), searchContactsByName);

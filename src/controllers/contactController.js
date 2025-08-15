@@ -247,3 +247,49 @@ export const getOwnedContacts = async (req, res) => {
         return responseSender(res, 500, false, null, error.message);
     }
 };
+
+export const getContactsCreatedLast28Days = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        const info = await getUserInfo(token);
+
+        if (!info || info.user.status !== 1) {
+            return responseSender(res, 401, false, null, "Unauthorized");
+        }
+
+        const organizationId = info.user.organization_id || info.user._id;
+
+        // Calculate date range for last 28 days
+        const now = new Date();
+        const startDate = new Date();
+        startDate.setDate(now.getDate() - 28);
+
+        const populateFields = [
+            { path: "owner_id", select: "name email" },
+            { path: "company_id", select: "name email" },
+            { path: "organization_id", select: "name email" },
+            { path: "createdBy", select: "name email" },
+            { path: "updatedBy", select: "name email" },
+        ];
+
+        const query = {
+            organization_id: organizationId,
+            createdAt: { $gte: startDate },
+            status: 1 // only active contacts
+        };
+
+        const [contacts, totalCount] = await Promise.all([
+            Contact.find(query).populate(populateFields).sort({ createdAt: -1 }),
+            Contact.countDocuments(query),
+        ]);
+
+        return responseSender(res, 200, true, {
+            contacts,
+            totalCount,
+            last28DaysStart: startDate,
+            last28DaysEnd: now
+        }, "Contacts from last 28 days fetched");
+    } catch (error) {
+        return responseSender(res, 500, false, null, error.message);
+    }
+};

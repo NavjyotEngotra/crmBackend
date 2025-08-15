@@ -290,3 +290,50 @@ export const getOwnedCompanies = async (req, res) => {
     return responseSender(res, 500, false, null, error.message);
   }
 };
+
+export const getCompaniesCreatedLast28Days = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    const info = await getUserInfo(token);
+
+    if (!info || info.user.status !== 1) {
+      return responseSender(res, 401, false, null, "Unauthorized");
+    }
+
+    const organizationId = info.user.organization_id || info.user._id;
+
+    // Calculate the date 28 days ago from now
+    const now = new Date();
+    const startDate = new Date(now);
+    startDate.setDate(now.getDate() - 28);
+
+    const populateFields = [
+      { path: "contactList" },
+      { path: "owner_id", select: "name email" },
+      { path: "organization_id", select: "name email" },
+      { path: "createdBy", select: "name email" },
+      { path: "updatedBy", select: "name email" },
+    ];
+
+    // Query for companies created within the last 28 days
+    const query = {
+      organization_id: organizationId,
+      createdAt: { $gte: startDate },
+      status: 1, // only active companies
+    };
+
+    const [companies, total] = await Promise.all([
+      Company.find(query).populate(populateFields).sort({ createdAt: -1 }),
+      Company.countDocuments(query),
+    ]);
+
+    return responseSender(res, 200, true, {
+      companies,
+      totalCount: total,
+      last28DaysStart: startDate,
+      last28DaysEnd: now,
+    });
+  } catch (error) {
+    return responseSender(res, 500, false, null, error.message);
+  }
+};

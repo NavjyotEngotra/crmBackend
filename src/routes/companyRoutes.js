@@ -7,7 +7,8 @@ import {
     searchCompaniesByName,
     updateCompany,
     updateStatus,
-    getOwnedCompanies
+    getOwnedCompanies,
+    getCompaniesCreatedLast28Days
 } from "../controllers/companyController.js";
 import { isAdmin } from "../middlewares/authMiddleware.js";
 import { checkPermission } from "../middlewares/checkPermission.js";
@@ -58,6 +59,9 @@ router.post("/",checkPermission("company.create"), createCompany);
  *         description: Unauthorized
  */
 router.get("/",checkPermission("company.read"), getCompanies);
+
+router.get("/getLast28days",checkPermission("company.read"), getCompaniesCreatedLast28Days);
+
 
 /**
  * @swagger

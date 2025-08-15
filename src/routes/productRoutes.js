@@ -9,7 +9,7 @@ import {
     searchProductsByName,
     searchProductsByCategory,
     getOwnedProducts
-} from "../controllers/productControllerOrgSpecific.js";
+} from "../controllers/productController.js";
 import { verifyOrgOrTeamMember } from "../middlewares/combinedAuthMiddleware.js";
 import { checkPermission } from "../middlewares/checkPermission.js";
 
