@@ -7,9 +7,13 @@ import responseSender from "../utilities/responseSender.js";
 export const createPipeline = async (req, res) => {
   try {
     const { name, description, users_has_access } = req.body;
-    const { type, user } = req.user;
+    const { role, id, organizationId } = req.user;
 
-    let organization_id = type === "organization" ? user._id : user.organization_id;
+    let organization_id;
+    if (role === "organization") organization_id = id;
+    else if (role === "team_member") organization_id = organizationId;
+    else if (role === "superadmin") organization_id = req.body.organization_id;
+    else return responseSender(res, 403, false, null, "Unauthorized role");
 
     const existingPipeline = await Pipeline.findOne({
       name,
@@ -18,15 +22,15 @@ export const createPipeline = async (req, res) => {
     });
 
     if (existingPipeline) {
-      return responseSender(res, 400, false,null,"A pipeline with this name already exists in your organization");
+      return responseSender(res, 400, false, null, "A pipeline with this name already exists in your organization");
     }
 
     const pipeline = new Pipeline({
       name,
       description,
-      users_has_access: [...users_has_access, user._id],
+      users_has_access: [...users_has_access, id],
       organization_id,
-      created_by: user._id
+      created_by: id
     });
 
     await pipeline.save();
@@ -35,24 +39,28 @@ export const createPipeline = async (req, res) => {
 
   } catch (error) {
     if (error.code === 11000) {
-      return responseSender(res, 400, false,null, "A pipeline with this name already exists in your organization");
+      return responseSender(res, 400, false, null, "A pipeline with this name already exists in your organization");
     }
-    return responseSender(res, 500, false,null, error.message);
+    return responseSender(res, 500, false, null, error.message);
   }
 };
 
 // Get Pipelines with filters
 export const getPipelines = async (req, res) => {
   try {
-    const { type, user } = req.user;
+    const { role, id, organizationId } = req.user;
     const { status, searchByName } = req.query;
     let query = {};
 
-    if (type === "organization") {
-      query.organization_id = user._id;
-    } else {
-      query.organization_id = user.organization_id;
-      query.users_has_access = user._id;
+    if (role === "organization") {
+      query.organization_id = id;
+    } else if (role === "team_member") {
+      query.organization_id = organizationId;
+      query.users_has_access = id;
+    } else if (role === "superadmin") {
+      if (req.query.organization_id) {
+        query.organization_id = req.query.organization_id;
+      }
     }
 
     if (status !== undefined) query.status = parseInt(status);
@@ -78,28 +86,30 @@ export const getPipelines = async (req, res) => {
       }
     });
   } catch (error) {
-    return responseSender(res, 500, false,null, error.message);
+    return responseSender(res, 500, false, null, error.message);
   }
 };
 
 // Update Pipeline
 export const updatePipeline = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id: pipelineId } = req.params;
     const { name, description, users_has_access, status } = req.body;
-    const { type, user } = req.user;
+    const { role, id, organizationId } = req.user;
 
-    let query = { _id: id };
-    if (type === "organization") {
-      query.organization_id = user._id;
-    } else {
-      query.organization_id = user.organization_id;
-      query.users_has_access = user._id;
+    let query = { _id: pipelineId };
+    if (role === "organization") {
+      query.organization_id = id;
+    } else if (role === "team_member") {
+      query.organization_id = organizationId;
+      query.users_has_access = id;
+    } else if (role === "superadmin" && req.body.organization_id) {
+      query.organization_id = req.body.organization_id;
     }
 
     const pipeline = await Pipeline.findOne(query);
     if (!pipeline) {
-      return responseSender(res, 404, false,null, "Pipeline not found or access denied");
+      return responseSender(res, 404, false, null, "Pipeline not found or access denied");
     }
 
     if (name && name !== pipeline.name) {
@@ -107,10 +117,10 @@ export const updatePipeline = async (req, res) => {
         name,
         organization_id: pipeline.organization_id,
         status: 1,
-        _id: { $ne: id }
+        _id: { $ne: pipelineId }
       });
       if (existingPipeline) {
-        return responseSender(res, 400, false,null, "A pipeline with this name already exists in your organization");
+        return responseSender(res, 400, false, null, "A pipeline with this name already exists in your organization");
       }
     }
 
@@ -118,32 +128,34 @@ export const updatePipeline = async (req, res) => {
     if (description) pipeline.description = description;
     if (users_has_access) pipeline.users_has_access = users_has_access;
     if (status !== undefined) pipeline.status = parseInt(status);
-    pipeline.updated_by = user._id;
+    pipeline.updated_by = id;
 
     await pipeline.save();
 
-    return responseSender(res, 200, true,  { pipeline });
+    return responseSender(res, 200, true, { pipeline });
 
   } catch (error) {
     if (error.code === 11000) {
-      return responseSender(res, 400, false,null, "A pipeline with this name already exists in your organization");
+      return responseSender(res, 400, false, null, "A pipeline with this name already exists in your organization");
     }
-    return responseSender(res, 500, false,null, error.message);
+    return responseSender(res, 500, false, null, error.message);
   }
 };
 
 // Get Pipeline by ID
 export const getPipelineById = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { type, user } = req.user;
+    const { id: pipelineId } = req.params;
+    const { role, id, organizationId } = req.user;
 
-    let query = { _id: id };
-    if (type === "organization") {
-      query.organization_id = user._id;
-    } else {
-      query.organization_id = user.organization_id;
-      query.users_has_access = user._id;
+    let query = { _id: pipelineId };
+    if (role === "organization") {
+      query.organization_id = id;
+    } else if (role === "team_member") {
+      query.organization_id = organizationId;
+      query.users_has_access = id;
+    } else if (role === "superadmin" && req.query.organization_id) {
+      query.organization_id = req.query.organization_id;
     }
 
     const pipeline = await Pipeline.findOne(query)
@@ -152,7 +164,7 @@ export const getPipelineById = async (req, res) => {
       .populate('users_has_access', 'name email');
 
     if (!pipeline) {
-      return responseSender(res, 404, false,null, "Pipeline not found or access denied");
+      return responseSender(res, 404, false, null, "Pipeline not found or access denied");
     }
 
     const stages = await Stage.find({
@@ -190,6 +202,6 @@ export const getPipelineById = async (req, res) => {
     });
 
   } catch (error) {
-    return responseSender(res, 500, false,null, error.message);
+    return responseSender(res, 500, false, null, error.message);
   }
 };
