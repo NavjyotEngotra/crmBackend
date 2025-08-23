@@ -7,6 +7,7 @@ import {
     deleteTask,
     getMeetingsAndTasks,
     getMeetingsAndTasksByDate,
+    getMeetingsAndTasksBetweenDates,
 } from "../controllers/taskController.js";
 import { verifyOrgOrTeamMember } from "../middlewares/combinedAuthMiddleware.js";
 import { checkPermission } from "../middlewares/checkPermission.js";
@@ -23,6 +24,13 @@ router.get(
     checkPermission("task.read"),
     verifyOrgOrTeamMember,
     getMeetingsAndTasksByDate
+);
+router.get(
+    "/meetings-and-tasks-between-dates",
+    checkPermission("meeting.read"),
+    checkPermission("task.read"),
+    verifyOrgOrTeamMember,
+    getMeetingsAndTasksBetweenDates
 );
 router.get("/:id", verifyOrgOrTeamMember, checkPermission("task.read"), getTaskById);
 router.delete("/:id", verifyOrgOrTeamMember, checkPermission("task.update"), deleteTask);

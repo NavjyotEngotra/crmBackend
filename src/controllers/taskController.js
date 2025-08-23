@@ -273,4 +273,82 @@ export const getMeetingsAndTasksByDate = async (req, res) => {
   } catch (error) {
     return responseSender(res, 500, false, null, error.message);
   }
+}
+
+
+export const getMeetingsAndTasksBetweenDates = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    const info = await getUserInfo(token);
+
+    if (!info) return responseSender(res, 401, false, null, "Unauthorized");
+
+    const orgId = info.user.organization_id || info.user._id;
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const skip = (page - 1) * limit;
+
+    // Validate and parse startDate and endDate
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return responseSender(res, 400, false, null, "startDate and endDate are required");
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return responseSender(res, 400, false, null, "Invalid date format");
+    }
+
+    // Normalize start to 00:00:00 and end to 23:59:59
+    const startOfRange = new Date(start.setHours(0, 0, 0, 0));
+    const endOfRange = new Date(end.setHours(23, 59, 59, 999));
+
+    // Queries
+    const meetingQuery = {
+      organization_id: orgId,
+      from: { $gte: startOfRange, $lte: endOfRange },
+    };
+
+    const taskQuery = {
+      organization_id: orgId,
+      due_date: { $gte: startOfRange, $lte: endOfRange },
+    };
+
+    // Status filters
+    if (req.query.statusCode !== undefined) {
+      const status = parseInt(req.query.statusCode);
+      meetingQuery.status = status;
+      taskQuery.statusCode = status;
+    } else {
+      meetingQuery.status = { $in: [0, 1] };
+      taskQuery.statusCode = { $in: [0, 1] };
+    }
+
+    // Fetch data
+    const [meetings, meetingTotal] = await Promise.all([
+      Meeting.find(meetingQuery).sort({ from: -1 }).skip(skip).limit(limit),
+      Meeting.countDocuments(meetingQuery),
+    ]);
+
+    const [tasks, taskTotal] = await Promise.all([
+      Task.find(taskQuery).sort({ due_date: -1 }).skip(skip).limit(limit),
+      Task.countDocuments(taskQuery),
+    ]);
+
+    return responseSender(res, 200, true, {
+      meetings,
+      tasks,
+      currentPage: page,
+      totalMeetingPages: Math.ceil(meetingTotal / limit),
+      totalTaskPages: Math.ceil(taskTotal / limit),
+      totalMeetings: meetingTotal,
+      totalTasks: taskTotal,
+    });
+  } catch (error) {
+    return responseSender(res, 500, false, null, error.message);
+  }
 };
