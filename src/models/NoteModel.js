@@ -4,6 +4,7 @@ const NoteSchema = new mongoose.Schema({
     title: { type: String, required: true },
     description: { type: String },
     module_id: { type: mongoose.Schema.Types.ObjectId, required: true },
+    module_name: { type: String, required: true },
     organization_id: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "Organization" },
     status: { type: Number, enum: [0, 1], default: 1 }, // 1 = active, 0 = deleted
     createdBy: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "TeamMember" },
