@@ -83,21 +83,18 @@ export const getNotesByModuleId = async (req, res) => {
 export const updateNote = async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const teamMember = await TeamMember.findById(decoded.id);
+    const info = await getUserInfo(token);
 
-    const { id } = req.params;
-    const note = await Note.findById(id);
-
-    if (!note || note.organization_id.toString() !== teamMember.organization_id.toString()) {
-      return responseSender(res, 404, false, null, "Note not found");
+    if (!info || info.user.status !== 1) {
+      return responseSender(res, 401, false, null, "Unauthorized");
     }
+    const organizationId = info.user.organization_id || info.user._id;
 
     const updateData = { ...req.body };
     delete updateData.module_id;
-    delete updateData.organization_id;
+    delete updateData.organizationId;
     delete updateData.status;
-    updateData.editedBy = teamMember._id;
+    updateData.editedBy = info.user._id;
 
     const updatedNote = await Note.findByIdAndUpdate(id, updateData, { new: true });
     return responseSender(res, 200, true, { note: updatedNote });
